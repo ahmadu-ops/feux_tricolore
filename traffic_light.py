@@ -18,36 +18,39 @@ class FeuTricolore:
     Gère l'affichage graphique d'un feu avec ses 3 lampes.
     """
     
-    def __init__(self, x: float, y: float, orientation: str, voie: int):
+    def __init__(self, screen: turtle.TurtleScreen, 
+                 x: float, y: float, orientation: str, voie: int):
         """
         Initialise un feu tricolore.
         
         Args:
+            screen: Écran Turtle sur lequel dessiner
             x: Position X du feu
             y: Position Y du feu
             orientation: 'vertical' ou 'horizontal'
             voie: Numéro de la voie (1 pour N-S, 2 pour E-O)
         """
+        self.screen = screen
         self.x = x
         self.y = y
         self.orientation = orientation
         self.voie = voie
         self.etat = EtatFeu.ROUGE
         
-        # Turtle principal pour le boîtier
-        self.turtle = turtle.Turtle()
+        # Turtle principal pour le boîtier (RawTurtle pour éviter fenêtre séparée)
+        self.turtle = turtle.RawTurtle(screen)
         self.turtle.hideturtle()
         self.turtle.speed(0)
         self.turtle.penup()
         
-        # Turtles pour chaque lampe (pour mise à jour indépendante)
-        self.lampes: Dict[str, turtle.Turtle] = {}
+        # Turtles pour chaque lampe
+        self.lampes: Dict[str, turtle.RawTurtle] = {}
         self._init_lampes()
     
     def _init_lampes(self) -> None:
         """Initialise les turtles pour les 3 lampes"""
         for nom in ['rouge', 'orange', 'vert']:
-            t = turtle.Turtle()
+            t = turtle.RawTurtle(self.screen)
             t.hideturtle()
             t.speed(0)
             t.penup()
@@ -197,7 +200,7 @@ class FeuTricolore:
             return True
         return False
     
-    def _dessiner_effet_brillance(self, t: turtle.Turtle, 
+    def _dessiner_effet_brillance(self, t: turtle.RawTurtle, 
                                    x: float, y: float, rayon: int) -> None:
         """Dessine un effet de brillance sur la lampe allumée"""
         # Petit cercle blanc pour l'effet de reflet
@@ -242,14 +245,18 @@ class GestionnaireFeux:
     Synchronise les feux des deux voies et gère les cycles automatiques.
     """
     
-    def __init__(self, on_change_callback: Callable = None):
+    def __init__(self, screen: turtle.TurtleScreen = None,
+                 on_change_callback: Callable = None):
         """
         Initialise le gestionnaire de feux.
         
         Args:
+            screen: Écran Turtle (requis)
             on_change_callback: Fonction appelée lors d'un changement d'état
                                Signature: callback(voie: int, etat: EtatFeu)
         """
+        self.screen = screen
+        
         # Feux par voie
         self.feux_voie1: List[FeuTricolore] = []  # Nord-Sud
         self.feux_voie2: List[FeuTricolore] = []  # Est-Ouest
@@ -269,15 +276,29 @@ class GestionnaireFeux:
         # Callback
         self.on_change_callback = on_change_callback
         
-        # Créer les feux
+        # Les feux seront créés quand le screen sera défini
+        if screen:
+            self._creer_feux()
+    
+    def set_screen(self, screen: turtle.TurtleScreen) -> None:
+        """
+        Définit l'écran Turtle et crée les feux.
+        
+        Args:
+            screen: Écran Turtle
+        """
+        self.screen = screen
         self._creer_feux()
     
     def _creer_feux(self) -> None:
         """Crée les 4 feux aux positions définies"""
+        if not self.screen:
+            return
+            
         positions = get_positions_feux()
         
         for nom, (x, y, orientation, voie) in positions.items():
-            feu = FeuTricolore(x, y, orientation, voie)
+            feu = FeuTricolore(self.screen, x, y, orientation, voie)
             
             if voie == 1:
                 self.feux_voie1.append(feu)

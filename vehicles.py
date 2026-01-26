@@ -12,88 +12,102 @@ from dataclasses import dataclass, field
 from scenarios import (
     EtatFeu, Scenario, Direction,
     get_config, ConfigScenario,
-    COULEURS, COULEURS_VOITURES, DIMENSIONS
+    COULEURS, COULEURS_VOITURES, DIMENSIONS,
+    get_position_depart
 )
-from traffic_light import GestionnaireFeux
 
 
 @dataclass
 class Voiture:
-    """
-    Représente un véhicule dans la simulation.
-    Gère la position, le mouvement et l'affichage d'une voiture.
-    """
+    """Représente un véhicule"""
     
-    # Identifiants
+    screen: turtle.TurtleScreen = field(repr=False)
     id: int
     direction: Direction
-    
-    # Position et mouvement
     x: float
     y: float
     vitesse: float = 0.0
-    vitesse_max: float = 3.0
-    acceleration: float = 0.2
-    deceleration: float = 0.3
-    
-    # Apparence
+    vitesse_max: float = 2.5
+    acceleration: float = 0.15
+    deceleration: float = 0.25
     couleur: str = "#3498DB"
-    largeur: float = field(default_factory=lambda: DIMENSIONS.voiture_largeur)
-    longueur: float = field(default_factory=lambda: DIMENSIONS.voiture_longueur)
     
     # États
     en_arret: bool = False
     a_passe_feu: bool = False
+    dans_intersection: bool = False
     
-    # Flags pour le logging (éviter les doublons)
+    # Flags logging
     logged_arret: bool = False
     logged_redemarrage: bool = False
     
-    # Turtle pour le dessin (initialisé après création)
-    _turtle: turtle.Turtle = field(default=None, repr=False, compare=False)
+    # Turtle
+    _turtle: turtle.RawTurtle = field(default=None, repr=False, compare=False)
+    
+    # Dimensions
+    largeur: float = DIMENSIONS.voiture_largeur
+    longueur: float = DIMENSIONS.voiture_longueur
     
     def __post_init__(self):
-        """Initialise le turtle après création de l'objet"""
-        self._turtle = turtle.Turtle()
-        self._turtle.hideturtle()
-        self._turtle.speed(0)
-        self._turtle.penup()
-    
-    @property
-    def turtle(self) -> turtle.Turtle:
-        """Retourne le turtle de la voiture"""
-        return self._turtle
+        if self.screen:
+            self._turtle = turtle.RawTurtle(self.screen)
+            self._turtle.hideturtle()
+            self._turtle.speed(0)
+            self._turtle.penup()
     
     def dessiner(self) -> None:
-        """Dessine la voiture à sa position actuelle"""
+        """Dessine la voiture"""
+        if not self._turtle:
+            return
+        
         t = self._turtle
         t.clear()
         
-        # Angle selon la direction
         angle = self.direction.angle
+        cos_a = math.cos(math.radians(angle))
+        sin_a = math.sin(math.radians(angle))
         
-        # Dessiner le corps
-        self._dessiner_corps(angle)
-        
-        # Dessiner les détails
-        self._dessiner_vitres(angle)
-        self._dessiner_phares(angle)
-    
-    def _dessiner_corps(self, angle: float) -> None:
-        """Dessine le corps principal de la voiture"""
-        t = self._turtle
-        
-        # Calculer les coins du rectangle orienté
-        coins = self._calculer_coins(
+        # Corps principal
+        self._dessiner_rectangle(
             self.x, self.y,
             self.longueur, self.largeur,
-            angle
+            angle, self.couleur
         )
         
-        # Dessiner le rectangle
-        t.pensize(1)
+        # Toit / cabine
+        self._dessiner_rectangle(
+            self.x - 3 * cos_a,
+            self.y - 3 * sin_a,
+            self.longueur * 0.5,
+            self.largeur * 0.7,
+            angle, self._assombrir(self.couleur)
+        )
+        
+        # Pare-brise
+        offset = self.longueur * 0.15
+        self._dessiner_rectangle(
+            self.x + offset * cos_a,
+            self.y + offset * sin_a,
+            8, self.largeur * 0.6,
+            angle, '#AED6F1'
+        )
+        
+        # Phares avant
+        self._dessiner_phares(angle, avant=True)
+        
+        # Feux arrière
+        self._dessiner_phares(angle, avant=False)
+    
+    def _dessiner_rectangle(self, cx: float, cy: float, 
+                            longueur: float, largeur: float,
+                            angle: float, couleur: str) -> None:
+        """Dessine un rectangle orienté"""
+        t = self._turtle
+        coins = self._calculer_coins(cx, cy, longueur, largeur, angle)
+        
+        t.fillcolor(couleur)
         t.pencolor('#1A1A1A')
-        t.fillcolor(self.couleur)
+        t.pensize(1)
         
         t.goto(coins[0])
         t.pendown()
@@ -104,122 +118,42 @@ class Voiture:
         t.end_fill()
         t.penup()
     
-    def _dessiner_vitres(self, angle: float) -> None:
-        """Dessine les vitres de la voiture"""
+    def _dessiner_phares(self, angle: float, avant: bool = True) -> None:
+        """Dessine les phares"""
         t = self._turtle
+        cos_a = math.cos(math.radians(angle))
+        sin_a = math.sin(math.radians(angle))
         
-        # Vitre avant (pare-brise)
-        offset_avant = self.longueur / 4
-        vx = self.x + offset_avant * math.cos(math.radians(angle))
-        vy = self.y + offset_avant * math.sin(math.radians(angle))
+        offset = (self.longueur / 2 - 2) * (1 if avant else -1)
+        couleur = '#F1C40F' if avant else '#E74C3C'
         
-        coins_vitre = self._calculer_coins(
-            vx, vy,
-            8, self.largeur - 6,
-            angle
-        )
-        
-        t.fillcolor('#85C1E9')  # Bleu clair pour les vitres
-        t.goto(coins_vitre[0])
-        t.pendown()
-        t.begin_fill()
-        for coin in coins_vitre[1:]:
-            t.goto(coin)
-        t.goto(coins_vitre[0])
-        t.end_fill()
-        t.penup()
-        
-        # Vitre arrière
-        offset_arriere = -self.longueur / 4
-        vx = self.x + offset_arriere * math.cos(math.radians(angle))
-        vy = self.y + offset_arriere * math.sin(math.radians(angle))
-        
-        coins_vitre = self._calculer_coins(
-            vx, vy,
-            6, self.largeur - 8,
-            angle
-        )
-        
-        t.goto(coins_vitre[0])
-        t.pendown()
-        t.begin_fill()
-        for coin in coins_vitre[1:]:
-            t.goto(coin)
-        t.goto(coins_vitre[0])
-        t.end_fill()
-        t.penup()
-    
-    def _dessiner_phares(self, angle: float) -> None:
-        """Dessine les phares de la voiture"""
-        t = self._turtle
-        
-        # Phares avant (jaunes)
-        offset = self.longueur / 2 - 3
-        largeur_phare = self.largeur / 2 - 2
-        
-        for cote in [-1, 1]:
-            px = self.x + offset * math.cos(math.radians(angle))
-            py = self.y + offset * math.sin(math.radians(angle))
+        for side in [-1, 1]:
+            px = self.x + offset * cos_a + side * (self.largeur/2 - 3) * cos_a
+            py = self.y + offset * sin_a + side * (self.largeur/2 - 3) * sin_a
             
-            # Décalage latéral
-            px += cote * largeur_phare * math.cos(math.radians(angle + 90))
-            py += cote * largeur_phare * math.sin(math.radians(angle + 90))
+            # Ajustement perpendiculaire
+            px += side * (self.largeur/2 - 4) * math.cos(math.radians(angle + 90))
+            py += side * (self.largeur/2 - 4) * math.sin(math.radians(angle + 90))
             
             t.goto(px, py - 2)
             t.pendown()
-            t.fillcolor('#F1C40F')
-            t.begin_fill()
-            t.circle(2)
-            t.end_fill()
-            t.penup()
-        
-        # Feux arrière (rouges)
-        offset = -self.longueur / 2 + 3
-        
-        for cote in [-1, 1]:
-            px = self.x + offset * math.cos(math.radians(angle))
-            py = self.y + offset * math.sin(math.radians(angle))
-            
-            px += cote * largeur_phare * math.cos(math.radians(angle + 90))
-            py += cote * largeur_phare * math.sin(math.radians(angle + 90))
-            
-            t.goto(px, py - 2)
-            t.pendown()
-            t.fillcolor('#E74C3C')
+            t.fillcolor(couleur)
             t.begin_fill()
             t.circle(2)
             t.end_fill()
             t.penup()
     
-    def _calculer_coins(self, cx: float, cy: float, 
+    def _calculer_coins(self, cx: float, cy: float,
                         longueur: float, largeur: float,
                         angle: float) -> List[Tuple[float, float]]:
-        """
-        Calcule les 4 coins d'un rectangle orienté.
-        
-        Args:
-            cx, cy: Centre du rectangle
-            longueur: Longueur (direction du mouvement)
-            largeur: Largeur
-            angle: Angle de rotation en degrés
-            
-        Returns:
-            Liste des 4 coins [(x1,y1), (x2,y2), ...]
-        """
+        """Calcule les coins d'un rectangle orienté"""
         cos_a = math.cos(math.radians(angle))
         sin_a = math.sin(math.radians(angle))
         
         l2, w2 = longueur / 2, largeur / 2
         
-        # Coins locaux (avant rotation)
-        coins_locaux = [
-            (-l2, -w2),
-            (l2, -w2),
-            (l2, w2),
-            (-l2, w2)
-        ]
+        coins_locaux = [(-l2, -w2), (l2, -w2), (l2, w2), (-l2, w2)]
         
-        # Appliquer rotation et translation
         coins = []
         for lx, ly in coins_locaux:
             rx = lx * cos_a - ly * sin_a + cx
@@ -228,128 +162,101 @@ class Voiture:
         
         return coins
     
-    def deplacer(self, vitesse: float) -> None:
-        """
-        Déplace la voiture selon sa direction.
-        
-        Args:
-            vitesse: Vitesse de déplacement
-        """
-        self.vitesse = vitesse
+    def _assombrir(self, hex_color: str) -> str:
+        """Assombrit une couleur"""
+        hex_color = hex_color.lstrip('#')
+        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        r, g, b = int(r * 0.7), int(g * 0.7), int(b * 0.7)
+        return f'#{r:02x}{g:02x}{b:02x}'
+    
+    def deplacer(self) -> None:
+        """Déplace la voiture"""
         dx, dy = self.direction.vecteur
-        self.x += dx * vitesse
-        self.y += dy * vitesse
+        self.x += dx * self.vitesse
+        self.y += dy * self.vitesse
     
     def accelerer(self) -> None:
-        """Accélère la voiture progressivement"""
         self.vitesse = min(self.vitesse_max, self.vitesse + self.acceleration)
     
     def freiner(self) -> None:
-        """Freine la voiture progressivement"""
         self.vitesse = max(0, self.vitesse - self.deceleration)
     
-    def arreter(self) -> None:
-        """Arrête complètement la voiture"""
-        self.vitesse = 0
-        self.en_arret = True
-    
-    def distance_au_feu(self) -> float:
+    def distance_a_ligne_arret(self) -> float:
         """
-        Calcule la distance à la ligne d'arrêt.
-        
-        Returns:
-            Distance en pixels, -1 si déjà passé
+        Distance à la ligne d'arrêt.
+        Retourne une valeur positive si AVANT la ligne,
+        négative si APRÈS (dans/passé l'intersection).
         """
         ligne = DIMENSIONS.ligne_arret
         
         if self.direction == Direction.NORD:
-            return ligne - self.y if self.y < ligne else -1
+            return -ligne - self.y  # Ligne au sud, voiture va vers nord
         elif self.direction == Direction.SUD:
-            return self.y - (-ligne) if self.y > -ligne else -1
+            return self.y - ligne  # Ligne au nord, voiture va vers sud
         elif self.direction == Direction.EST:
-            return ligne - self.x if self.x < ligne else -1
+            return -ligne - self.x  # Ligne à l'ouest, voiture va vers est
         elif self.direction == Direction.OUEST:
-            return self.x - (-ligne) if self.x > -ligne else -1
+            return self.x - ligne  # Ligne à l'est, voiture va vers ouest
         
-        return -1
+        return 0
+    
+    def est_avant_ligne(self) -> bool:
+        """Vérifie si la voiture est avant la ligne d'arrêt"""
+        return self.distance_a_ligne_arret() > 0
+    
+    def est_dans_intersection(self) -> bool:
+        """Vérifie si la voiture est dans l'intersection"""
+        zone = DIMENSIONS.zone_intersection
+        return abs(self.x) < zone and abs(self.y) < zone
     
     def est_hors_ecran(self) -> bool:
-        """Vérifie si la voiture est sortie de l'écran"""
         limite = DIMENSIONS.limite_ecran
         return abs(self.x) > limite or abs(self.y) > limite
     
     def effacer(self) -> None:
-        """Efface la voiture de l'écran"""
         if self._turtle:
             self._turtle.clear()
-    
-    def __del__(self):
-        """Destructeur - nettoie le turtle"""
-        self.effacer()
 
 
 class GestionnaireVoitures:
-    """
-    Gère l'ensemble des véhicules de la simulation.
-    Contrôle la création, le mouvement et la suppression des voitures.
-    """
+    """Gère tous les véhicules"""
     
-    def __init__(self, gestionnaire_feux: GestionnaireFeux):
-        """
-        Initialise le gestionnaire de voitures.
-        
-        Args:
-            gestionnaire_feux: Référence au gestionnaire des feux
-        """
-        self.voitures: List[Voiture] = []
+    def __init__(self, screen: turtle.TurtleScreen = None, gestionnaire_feux=None):
+        self.screen = screen
         self.gestionnaire_feux = gestionnaire_feux
-        
-        # Compteur d'ID unique
-        self.compteur_id: int = 0
-        
-        # Configuration
+        self.voitures: List[Voiture] = []
+        self.compteur_id = 0
         self.scenario = Scenario.NORMAL
-        self.config: ConfigScenario = get_config(Scenario.NORMAL)
-        
-        # Callback pour les événements
+        self.config = get_config(Scenario.NORMAL)
         self.on_event_callback: Optional[Callable] = None
     
+    def set_screen(self, screen: turtle.TurtleScreen) -> None:
+        self.screen = screen
+    
+    def set_gestionnaire_feux(self, gf) -> None:
+        self.gestionnaire_feux = gf
+    
     def changer_scenario(self, scenario: Scenario) -> None:
-        """
-        Change le scénario actif.
-        
-        Args:
-            scenario: Nouveau scénario
-        """
         self.scenario = scenario
         self.config = get_config(scenario)
     
     def creer_voiture(self, direction: Direction = None) -> Optional[Voiture]:
-        """
-        Crée une nouvelle voiture.
+        """Crée une nouvelle voiture"""
+        if not self.screen:
+            return None
         
-        Args:
-            direction: Direction de la voiture (aléatoire si None)
-            
-        Returns:
-            Nouvelle voiture ou None si impossible
-        """
-        # Vérifier la limite
         if len(self.voitures) >= self.config.max_voitures:
             return None
         
-        # Direction aléatoire si non spécifiée
         if direction is None:
             direction = random.choice(list(Direction))
         
-        # Position de départ
-        x, y = direction.position_depart
+        x, y = get_position_depart(direction)
         
-        # Vérifier les collisions avec les voitures existantes
-        if self._collision_au_spawn(x, y, direction):
+        # Vérifier collision au spawn
+        if self._collision_spawn(x, y, direction):
             return None
         
-        # Créer la voiture
         self.compteur_id += 1
         
         vitesse_max = self.config.vitesse_base + random.uniform(
@@ -358,6 +265,7 @@ class GestionnaireVoitures:
         )
         
         voiture = Voiture(
+            screen=self.screen,
             id=self.compteur_id,
             direction=direction,
             x=x,
@@ -369,238 +277,157 @@ class GestionnaireVoitures:
         self.voitures.append(voiture)
         return voiture
     
-    def _collision_au_spawn(self, x: float, y: float, 
-                            direction: Direction) -> bool:
-        """
-        Vérifie s'il y a collision au point de spawn.
+    def _collision_spawn(self, x: float, y: float, direction: Direction) -> bool:
+        """Vérifie collision au point de spawn"""
+        dist_min = DIMENSIONS.distance_securite + DIMENSIONS.voiture_longueur
         
-        Args:
-            x, y: Position de spawn
-            direction: Direction de la nouvelle voiture
-            
-        Returns:
-            True s'il y a collision
-        """
-        distance_min = DIMENSIONS.distance_securite + DIMENSIONS.voiture_longueur
-        
-        for voiture in self.voitures:
-            if voiture.direction != direction:
-                continue
-            
-            dist = math.sqrt((voiture.x - x)**2 + (voiture.y - y)**2)
-            if dist < distance_min:
-                return True
-        
+        for v in self.voitures:
+            if v.direction == direction:
+                dist = math.sqrt((v.x - x)**2 + (v.y - y)**2)
+                if dist < dist_min:
+                    return True
         return False
     
     def generer_aleatoire(self) -> Optional[Voiture]:
-        """
-        Génère une voiture aléatoirement selon la probabilité du scénario.
-        
-        Returns:
-            Nouvelle voiture ou None
-        """
+        """Génère une voiture aléatoirement"""
         if random.random() < self.config.freq_apparition:
             return self.creer_voiture()
         return None
     
     def update(self, dt: float) -> None:
-        """
-        Met à jour toutes les voitures.
+        """Met à jour toutes les voitures"""
+        if not self.gestionnaire_feux:
+            return
         
-        Args:
-            dt: Temps écoulé depuis la dernière mise à jour
-        """
-        voitures_a_supprimer: List[Voiture] = []
+        a_supprimer = []
         
         for voiture in self.voitures:
-            # Obtenir l'état du feu pour cette direction
             etat_feu = self.gestionnaire_feux.get_etat_pour_direction(voiture.direction)
             
-            # Vérifier si doit s'arrêter
+            # Logique d'arrêt
             doit_sarreter = self._doit_sarreter(voiture, etat_feu)
-            
-            # Vérifier collision avec voiture devant
             voiture_devant = self._voiture_devant(voiture)
             
             if doit_sarreter or voiture_devant:
-                # Freiner
                 voiture.freiner()
                 
                 if voiture.vitesse == 0 and not voiture.en_arret:
                     voiture.en_arret = True
-                    
-                    # Log l'arrêt (une seule fois)
                     if not voiture.logged_arret:
-                        self._notifier_event('arret', voiture)
+                        self._notifier('arret', voiture)
                         voiture.logged_arret = True
                         voiture.logged_redemarrage = False
             else:
-                # Redémarrer si était à l'arrêt
                 if voiture.en_arret:
                     voiture.en_arret = False
-                    
                     if not voiture.logged_redemarrage:
-                        self._notifier_event('redemarrage', voiture)
+                        self._notifier('redemarrage', voiture)
                         voiture.logged_redemarrage = True
                         voiture.logged_arret = False
                 
-                # Accélérer
                 voiture.accelerer()
             
-            # Déplacer
-            voiture.deplacer(voiture.vitesse)
+            voiture.deplacer()
             
-            # Vérifier si hors écran
+            # Marquer si dans intersection
+            if voiture.est_dans_intersection():
+                voiture.dans_intersection = True
+            
+            # Hors écran
             if voiture.est_hors_ecran():
-                self._notifier_event('sortie', voiture)
-                voitures_a_supprimer.append(voiture)
+                self._notifier('sortie', voiture)
+                a_supprimer.append(voiture)
         
-        # Supprimer les voitures sorties
-        for voiture in voitures_a_supprimer:
-            self._supprimer_voiture(voiture)
+        for v in a_supprimer:
+            v.effacer()
+            self.voitures.remove(v)
     
     def _doit_sarreter(self, voiture: Voiture, etat_feu: EtatFeu) -> bool:
-        """
-        Détermine si une voiture doit s'arrêter.
+        """Détermine si la voiture doit s'arrêter"""
         
-        Args:
-            voiture: La voiture à vérifier
-            etat_feu: État du feu pour cette direction
-            
-        Returns:
-            True si la voiture doit s'arrêter
-        """
-        # Si déjà passé le feu, ne pas s'arrêter
-        if voiture.a_passe_feu:
+        # Si déjà dans l'intersection, continuer !
+        if voiture.dans_intersection or voiture.a_passe_feu:
             return False
         
-        distance = voiture.distance_au_feu()
+        # Distance à la ligne d'arrêt
+        distance = voiture.distance_a_ligne_arret()
         
-        # A passé le feu
-        if distance < 0:
+        # Si passé la ligne (distance négative), marquer et continuer
+        if distance <= 0:
             voiture.a_passe_feu = True
             return False
         
-        # Zone d'arrêt (avant la ligne)
-        zone_arret = DIMENSIONS.distance_securite + voiture.longueur / 2
+        # Zone d'arrêt : doit s'arrêter si proche de la ligne
+        zone_decision = DIMENSIONS.distance_securite + voiture.longueur
         
-        # Feu rouge: s'arrêter si dans la zone
+        # Feu rouge : s'arrêter si dans la zone
         if etat_feu == EtatFeu.ROUGE:
-            return distance < zone_arret
+            if distance < zone_decision:
+                return True
         
-        # Feu orange: s'arrêter si assez loin, sinon continuer
+        # Feu orange : s'arrêter seulement si assez loin pour freiner
         elif etat_feu == EtatFeu.ORANGE:
-            # Si proche du feu, continuer
-            if distance < 30:
+            # Si très proche, continuer (ne peut plus s'arrêter à temps)
+            if distance < 40:
+                voiture.a_passe_feu = True
                 return False
-            return distance < zone_arret
+            if distance < zone_decision:
+                return True
         
-        # Feu orange clignotant (mode nuit): ralentir mais pas s'arrêter
-        elif etat_feu == EtatFeu.ORANGE_CLIGNOTANT:
-            return False
-        
-        # Feu vert: ne pas s'arrêter
+        # Feu vert ou clignotant : pas d'arrêt
         return False
     
     def _voiture_devant(self, voiture: Voiture) -> bool:
-        """
-        Vérifie s'il y a une voiture devant.
-        
-        Args:
-            voiture: La voiture à vérifier
-            
-        Returns:
-            True s'il y a une voiture devant à distance de sécurité
-        """
-        distance_securite = DIMENSIONS.distance_securite
+        """Vérifie s'il y a une voiture devant"""
+        dist_secu = DIMENSIONS.distance_securite
         
         for autre in self.voitures:
-            # Ignorer la même voiture
             if autre.id == voiture.id:
                 continue
-            
-            # Ignorer les voitures d'autres directions
             if autre.direction != voiture.direction:
                 continue
             
-            # Vérifier si l'autre est devant
             devant = False
-            distance = 0
+            dist = 0
             
             if voiture.direction == Direction.NORD:
                 if autre.y > voiture.y:
                     devant = True
-                    distance = autre.y - voiture.y
+                    dist = autre.y - voiture.y
             elif voiture.direction == Direction.SUD:
                 if autre.y < voiture.y:
                     devant = True
-                    distance = voiture.y - autre.y
+                    dist = voiture.y - autre.y
             elif voiture.direction == Direction.EST:
                 if autre.x > voiture.x:
                     devant = True
-                    distance = autre.x - voiture.x
+                    dist = autre.x - voiture.x
             elif voiture.direction == Direction.OUEST:
                 if autre.x < voiture.x:
                     devant = True
-                    distance = voiture.x - autre.x
+                    dist = voiture.x - autre.x
             
-            if devant and distance < distance_securite:
+            if devant and dist < dist_secu:
                 return True
         
         return False
     
-    def _notifier_event(self, event_type: str, voiture: Voiture) -> None:
-        """
-        Notifie un événement via le callback.
-        
-        Args:
-            event_type: Type d'événement
-            voiture: Voiture concernée
-        """
+    def _notifier(self, event: str, voiture: Voiture) -> None:
         if self.on_event_callback:
-            self.on_event_callback(event_type, voiture)
-    
-    def _supprimer_voiture(self, voiture: Voiture) -> None:
-        """
-        Supprime une voiture de la simulation.
-        
-        Args:
-            voiture: Voiture à supprimer
-        """
-        voiture.effacer()
-        if voiture in self.voitures:
-            self.voitures.remove(voiture)
+            self.on_event_callback(event, voiture)
     
     def dessiner_toutes(self) -> None:
-        """Dessine toutes les voitures"""
-        for voiture in self.voitures:
-            voiture.dessiner()
+        for v in self.voitures:
+            v.dessiner()
     
     def supprimer_toutes(self) -> None:
-        """Supprime toutes les voitures"""
-        for voiture in self.voitures:
-            voiture.effacer()
+        for v in self.voitures:
+            v.effacer()
         self.voitures.clear()
     
-    def get_nombre_voitures(self) -> int:
-        """Retourne le nombre de voitures actuelles"""
+    def get_nombre(self) -> int:
         return len(self.voitures)
     
     def reinitialiser(self) -> None:
-        """Réinitialise le gestionnaire"""
         self.supprimer_toutes()
         self.compteur_id = 0
-
-
-# ============================================================================
-# TEST DU MODULE
-# ============================================================================
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("TEST DU MODULE vehicles.py")
-    print("=" * 60)
-    print("\nCe module nécessite un environnement graphique.")
-    print("Il sera testé via main.py")
-    print("\n[TEST] Import réussi ✅")

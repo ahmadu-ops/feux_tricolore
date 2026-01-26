@@ -21,7 +21,6 @@ class EtatFeu(Enum):
     
     @property
     def couleur_hex(self) -> str:
-        """Retourne le code couleur hexadécimal"""
         couleurs = {
             EtatFeu.ROUGE: "#E74C3C",
             EtatFeu.ORANGE: "#F39C12",
@@ -33,7 +32,6 @@ class EtatFeu(Enum):
     
     @property
     def couleur_eteinte(self) -> str:
-        """Retourne le code couleur quand le feu est éteint"""
         couleurs = {
             EtatFeu.ROUGE: "#5D2A2A",
             EtatFeu.ORANGE: "#5D4A1A",
@@ -45,7 +43,6 @@ class EtatFeu(Enum):
     
     @property
     def emoji(self) -> str:
-        """Retourne l'emoji correspondant"""
         emojis = {
             EtatFeu.ROUGE: "🔴",
             EtatFeu.ORANGE: "🟡",
@@ -68,7 +65,6 @@ class Scenario(Enum):
     
     @property
     def emoji(self) -> str:
-        """Retourne l'emoji correspondant au scénario"""
         emojis = {
             Scenario.NORMAL: "🚗",
             Scenario.HEURE_POINTE: "🚦",
@@ -79,29 +75,27 @@ class Scenario(Enum):
     
     @property
     def description(self) -> str:
-        """Retourne une description du scénario"""
         descriptions = {
-            Scenario.NORMAL: "Circulation fluide avec timing standard des feux",
-            Scenario.HEURE_POINTE: "Trafic dense, feu vert prolongé, génération rapide",
-            Scenario.NUIT: "Feu orange clignotant, peu de véhicules",
-            Scenario.MANUEL: "Contrôle total des feux par l'utilisateur"
+            Scenario.NORMAL: "Flux régulier, timing standard",
+            Scenario.HEURE_POINTE: "Trafic dense, feu vert prolongé",
+            Scenario.NUIT: "Feu orange clignotant",
+            Scenario.MANUEL: "Contrôle total par l'utilisateur"
         }
         return descriptions.get(self, "")
 
 
 class Direction(Enum):
     """Directions possibles des véhicules"""
-    NORD = "NORD"      # Vient du sud, va vers le nord
-    SUD = "SUD"        # Vient du nord, va vers le sud
-    EST = "EST"        # Vient de l'ouest, va vers l'est
-    OUEST = "OUEST"    # Vient de l'est, va vers l'ouest
+    NORD = "NORD"
+    SUD = "SUD"
+    EST = "EST"
+    OUEST = "OUEST"
     
     def __str__(self) -> str:
         return self.value
     
     @property
     def angle(self) -> float:
-        """Retourne l'angle de rotation en degrés"""
         angles = {
             Direction.NORD: 90,
             Direction.SUD: -90,
@@ -112,7 +106,6 @@ class Direction(Enum):
     
     @property
     def vecteur(self) -> Tuple[int, int]:
-        """Retourne le vecteur de déplacement (dx, dy)"""
         vecteurs = {
             Direction.NORD: (0, 1),
             Direction.SUD: (0, -1),
@@ -123,38 +116,15 @@ class Direction(Enum):
     
     @property
     def voie(self) -> int:
-        """Retourne le numéro de voie (1 pour N-S, 2 pour E-O)"""
+        """1 pour Nord-Sud, 2 pour Est-Ouest"""
         if self in [Direction.NORD, Direction.SUD]:
             return 1
         return 2
-    
-    @property
-    def position_depart(self) -> Tuple[float, float]:
-        """Retourne la position de départ pour cette direction"""
-        positions = {
-            Direction.NORD: (-30, -420),
-            Direction.SUD: (30, 420),
-            Direction.EST: (-420, 30),
-            Direction.OUEST: (420, -30)
-        }
-        return positions.get(self, (0, 0))
 
 
 @dataclass(frozen=True)
 class ConfigScenario:
-    """
-    Configuration immuable d'un scénario.
-    
-    Attributes:
-        duree_vert: Durée du feu vert en secondes
-        duree_orange: Durée du feu orange en secondes
-        freq_apparition: Probabilité d'apparition d'une voiture par tick (0.0 à 1.0)
-        vitesse_base: Vitesse de base des véhicules
-        vitesse_variation: Variation aléatoire de vitesse (+/-)
-        max_voitures: Nombre maximum de voitures simultanées
-        mode_clignotant: True si le mode clignotant est actif
-        delai_clignotement: Durée d'un cycle de clignotement (allumé/éteint)
-    """
+    """Configuration d'un scénario"""
     duree_vert: float
     duree_orange: float
     freq_apparition: float
@@ -166,42 +136,30 @@ class ConfigScenario:
     
     @property
     def duree_rouge(self) -> float:
-        """
-        Calcule la durée du feu rouge.
-        Rouge = Vert opposé + Orange opposé
-        """
         return self.duree_vert + self.duree_orange
-    
-    @property
-    def duree_cycle_complet(self) -> float:
-        """Calcule la durée d'un cycle complet de feux"""
-        return 2 * (self.duree_vert + self.duree_orange)
 
 
-# Configuration de chaque scénario
 SCENARIOS_CONFIG: Dict[Scenario, ConfigScenario] = {
     Scenario.NORMAL: ConfigScenario(
         duree_vert=10.0,
         duree_orange=3.0,
-        freq_apparition=0.03,
-        vitesse_base=3.0,
+        freq_apparition=0.025,
+        vitesse_base=2.5,
         vitesse_variation=0.5,
-        max_voitures=10,
-        mode_clignotant=False
+        max_voitures=12
     ),
     Scenario.HEURE_POINTE: ConfigScenario(
         duree_vert=15.0,
         duree_orange=2.0,
-        freq_apparition=0.08,
-        vitesse_base=2.5,
+        freq_apparition=0.06,
+        vitesse_base=2.0,
         vitesse_variation=0.3,
-        max_voitures=15,
-        mode_clignotant=False
+        max_voitures=15
     ),
     Scenario.NUIT: ConfigScenario(
-        duree_vert=0.0,  # Pas utilisé en mode nuit
+        duree_vert=0.0,
         duree_orange=0.5,
-        freq_apparition=0.01,
+        freq_apparition=0.008,
         vitesse_base=2.0,
         vitesse_variation=0.3,
         max_voitures=5,
@@ -209,147 +167,97 @@ SCENARIOS_CONFIG: Dict[Scenario, ConfigScenario] = {
         delai_clignotement=0.5
     ),
     Scenario.MANUEL: ConfigScenario(
-        duree_vert=999999.0,  # Durée infinie (contrôle manuel)
+        duree_vert=999999.0,
         duree_orange=999999.0,
-        freq_apparition=0.04,
-        vitesse_base=3.0,
+        freq_apparition=0.03,
+        vitesse_base=2.5,
         vitesse_variation=0.5,
-        max_voitures=12,
-        mode_clignotant=False
+        max_voitures=12
     )
 }
 
 
 def get_config(scenario: Scenario) -> ConfigScenario:
-    """
-    Récupère la configuration d'un scénario.
-    
-    Args:
-        scenario: Le scénario souhaité
-        
-    Returns:
-        Configuration du scénario
-    """
     return SCENARIOS_CONFIG.get(scenario, SCENARIOS_CONFIG[Scenario.NORMAL])
 
 
-# ============================================================================
-# COULEURS DU DESIGN
-# ============================================================================
-
 @dataclass(frozen=True)
 class Couleurs:
-    """Palette de couleurs pour le design du carrefour"""
-    
-    # Routes et marquages
-    route: str = "#2C3E50"
-    marquage: str = "#ECF0F1"
+    """Palette de couleurs"""
+    # Routes
+    route: str = "#34495E"
+    route_bordure: str = "#2C3E50"
+    marquage: str = "#FFFFFF"
     marquage_jaune: str = "#F1C40F"
     
     # Environnement
-    herbe: str = "#27AE60"
-    herbe_fonce: str = "#1E8449"
-    trottoir: str = "#7F8C8D"
+    herbe: str = "#2ECC71"
+    herbe_fonce: str = "#27AE60"
+    trottoir: str = "#95A5A6"
     
-    # Feux tricolores
+    # Feux
     feu_support: str = "#2C3E50"
     feu_cadre: str = "#1A1A1A"
     rouge: str = "#E74C3C"
     orange: str = "#F39C12"
     vert: str = "#2ECC71"
-    rouge_eteint: str = "#5D2A2A"
-    orange_eteint: str = "#5D4A1A"
-    vert_eteint: str = "#1A4A2A"
+    rouge_eteint: str = "#4A1A1A"
+    orange_eteint: str = "#4A3A0A"
+    vert_eteint: str = "#0A3A1A"
     
     # Interface
-    bg_dark: str = "#1A1A2E"
-    bg_panel: str = "#16213E"
-    bg_card: str = "#0F3460"
-    text_primary: str = "#ECF0F1"
-    text_secondary: str = "#BDC3C7"
-    accent: str = "#3498DB"
+    bg_dark: str = "#0D1B2A"
+    bg_panel: str = "#1B263B"
+    bg_card: str = "#415A77"
+    bg_button: str = "#778DA9"
+    text_primary: str = "#E0E1DD"
+    text_secondary: str = "#778DA9"
+    accent: str = "#00B4D8"
+    success: str = "#06D6A0"
+    warning: str = "#FFD166"
+    danger: str = "#EF476F"
 
 
-# Instance globale des couleurs
 COULEURS = Couleurs()
 
 
-# ============================================================================
-# COULEURS DES VOITURES
-# ============================================================================
-
 COULEURS_VOITURES = [
-    "#E74C3C",  # Rouge
-    "#3498DB",  # Bleu
-    "#2ECC71",  # Vert
-    "#F39C12",  # Orange
-    "#9B59B6",  # Violet
-    "#1ABC9C",  # Turquoise
-    "#E67E22",  # Orange foncé
-    "#34495E",  # Gris foncé
-    "#7F8C8D",  # Gris
-    "#C0392B",  # Rouge foncé
-    "#2980B9",  # Bleu foncé
-    "#27AE60",  # Vert foncé
-    "#8E44AD",  # Violet foncé
-    "#F1C40F",  # Jaune
-    "#1ABC9C",  # Cyan
+    "#E74C3C", "#3498DB", "#2ECC71", "#F39C12", "#9B59B6",
+    "#1ABC9C", "#E67E22", "#34495E", "#E91E63", "#00BCD4",
+    "#8BC34A", "#FF5722", "#607D8B", "#9C27B0", "#3F51B5"
 ]
 
 
-# ============================================================================
-# DIMENSIONS DU CARREFOUR
-# ============================================================================
-
 @dataclass(frozen=True)
 class DimensionsCarrefour:
-    """Dimensions du carrefour et des éléments"""
-    
-    # Canvas
-    canvas_width: int = 750
-    canvas_height: int = 750
-    
+    """Dimensions du carrefour"""
     # Routes
-    largeur_route: int = 80
-    largeur_voie: int = 40
+    largeur_route: int = 100
+    largeur_voie: int = 50
     
     # Feux
-    feu_largeur: int = 25
-    feu_hauteur: int = 70
-    feu_rayon_lampe: int = 8
-    feu_espacement_lampes: int = 20
+    feu_largeur: int = 30
+    feu_hauteur: int = 80
+    feu_rayon_lampe: int = 10
+    feu_espacement_lampes: int = 22
     
     # Voitures
-    voiture_largeur: int = 20
-    voiture_longueur: int = 35
+    voiture_largeur: int = 22
+    voiture_longueur: int = 40
     
-    # Distances
-    ligne_arret: int = 70  # Distance du centre à la ligne d'arrêt
-    distance_securite: int = 45  # Distance minimale entre voitures
-    limite_ecran: int = 450  # Limite pour considérer une voiture hors écran
-    
-    # Passages piétons
-    passage_largeur: int = 20
-    passage_bande: int = 8
-    passage_espacement: int = 15
+    # Distances - IMPORTANT pour l'arrêt
+    ligne_arret: int = 110  # Distance du centre à la ligne d'arrêt
+    zone_intersection: int = 100  # Zone centrale du carrefour
+    distance_securite: int = 50  # Distance entre voitures
+    limite_ecran: int = 380  # Limite pour sortie
 
 
-# Instance globale des dimensions
 DIMENSIONS = DimensionsCarrefour()
 
 
-# ============================================================================
-# POSITIONS DES FEUX
-# ============================================================================
-
 def get_positions_feux() -> Dict[str, Tuple[float, float, str, int]]:
-    """
-    Retourne les positions des 4 feux tricolores.
-    
-    Returns:
-        Dictionnaire avec (x, y, orientation, voie) pour chaque feu
-    """
-    offset = DIMENSIONS.largeur_route + 5
+    """Retourne les positions des 4 feux"""
+    offset = DIMENSIONS.largeur_route + 20
     
     return {
         "nord_ouest": (-offset, offset, "vertical", 1),
@@ -359,46 +267,28 @@ def get_positions_feux() -> Dict[str, Tuple[float, float, str, int]]:
     }
 
 
-# ============================================================================
-# TEST DU MODULE
-# ============================================================================
+def get_position_depart(direction: Direction) -> Tuple[float, float]:
+    """Retourne la position de départ pour une direction"""
+    offset_voie = 25  # Décalage pour être sur la bonne voie
+    depart = 350  # Distance du centre
+    
+    positions = {
+        Direction.NORD: (-offset_voie, -depart),
+        Direction.SUD: (offset_voie, depart),
+        Direction.EST: (-depart, offset_voie),
+        Direction.OUEST: (depart, -offset_voie)
+    }
+    return positions.get(direction, (0, 0))
+
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("TEST DU MODULE scenarios.py")
+    print("TEST scenarios.py")
     print("=" * 60)
     
-    # Test des énumérations
-    print("\n[TEST] États des feux:")
-    for etat in EtatFeu:
-        print(f"  {etat.emoji} {etat.value} - Couleur: {etat.couleur_hex}")
-    
-    print("\n[TEST] Scénarios:")
     for scenario in Scenario:
         config = get_config(scenario)
-        print(f"  {scenario.emoji} {scenario.value}")
-        print(f"      Description: {scenario.description}")
-        print(f"      Vert: {config.duree_vert}s, Orange: {config.duree_orange}s")
-        print(f"      Fréquence: {config.freq_apparition}, Max voitures: {config.max_voitures}")
+        print(f"\n{scenario.emoji} {scenario.value}")
+        print(f"   {scenario.description}")
     
-    print("\n[TEST] Directions:")
-    for direction in Direction:
-        print(f"  {direction.value}: Angle={direction.angle}°, "
-              f"Voie={direction.voie}, Départ={direction.position_depart}")
-    
-    print("\n[TEST] Couleurs:")
-    print(f"  Route: {COULEURS.route}")
-    print(f"  Herbe: {COULEURS.herbe}")
-    print(f"  Feu rouge: {COULEURS.rouge}")
-    
-    print("\n[TEST] Dimensions:")
-    print(f"  Canvas: {DIMENSIONS.canvas_width}x{DIMENSIONS.canvas_height}")
-    print(f"  Route: {DIMENSIONS.largeur_route}px")
-    print(f"  Voiture: {DIMENSIONS.voiture_longueur}x{DIMENSIONS.voiture_largeur}px")
-    
-    print("\n[TEST] Positions des feux:")
-    positions = get_positions_feux()
-    for nom, (x, y, orientation, voie) in positions.items():
-        print(f"  {nom}: ({x}, {y}) - {orientation} - Voie {voie}")
-    
-    print("\n[TEST] Tests terminés avec succès ✅")
+    print("\n✅ Module OK")

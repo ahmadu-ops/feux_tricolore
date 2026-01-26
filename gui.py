@@ -1,721 +1,543 @@
 """
-gui.py - Interface graphique Tkinter
+gui.py - Interface graphique moderne
 Projet Feu Tricolore - Ville de Thiès
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import Callable, Optional, Dict
+from typing import Callable, Dict
 from scenarios import Scenario, EtatFeu, COULEURS
 
 
-class BoutonStyle:
-    """Styles prédéfinis pour les boutons"""
-    
-    PLAY = {
-        'bg': '#27AE60',
-        'fg': 'white',
-        'activebackground': '#2ECC71',
-        'activeforeground': 'white'
-    }
-    
-    PAUSE = {
-        'bg': '#F39C12',
-        'fg': 'white',
-        'activebackground': '#F1C40F',
-        'activeforeground': 'white'
-    }
-    
-    STOP = {
-        'bg': '#E74C3C',
-        'fg': 'white',
-        'activebackground': '#C0392B',
-        'activeforeground': 'white'
-    }
-    
-    RESET = {
-        'bg': '#9B59B6',
-        'fg': 'white',
-        'activebackground': '#8E44AD',
-        'activeforeground': 'white'
-    }
-    
-    FEU = {
-        'bg': '#2C3E50',
-        'fg': 'white',
-        'activebackground': '#34495E',
-        'activeforeground': 'white'
-    }
-
-
 class PanneauControle(tk.Frame):
-    """
-    Panneau de contrôle principal de l'interface.
-    Contient tous les boutons et contrôles de la simulation.
-    """
+    """Panneau de contrôle moderne"""
     
     def __init__(self, parent: tk.Widget, callbacks: Dict[str, Callable]):
-        """
-        Initialise le panneau de contrôle.
-        
-        Args:
-            parent: Widget parent
-            callbacks: Dictionnaire des fonctions de callback
-                - 'play': Fonction pour démarrer
-                - 'pause': Fonction pour pause
-                - 'stop': Fonction pour arrêter
-                - 'reset': Fonction pour réinitialiser
-                - 'scenario_change': Fonction pour changement de scénario
-                - 'feu_manuel': Fonction pour contrôle manuel des feux
-        """
-        super().__init__(parent, bg=COULEURS.bg_panel, width=280)
-        self.pack_propagate(False)
+        super().__init__(parent, bg=COULEURS.bg_panel)
         
         self.callbacks = callbacks
-        
-        # Variables
         self.scenario_var = tk.StringVar(value=Scenario.NORMAL.value)
         
-        # Créer les sections
-        self._creer_titre()
+        self._creer_widgets()
+    
+    def _creer_widgets(self) -> None:
+        """Crée tous les widgets"""
+        self._creer_header()
         self._creer_section_simulation()
-        self._creer_separateur()
         self._creer_section_scenarios()
-        self._creer_separateur()
-        self._creer_section_manuel()
-        self._creer_separateur()
-        self._creer_section_etat()
+        self._creer_section_feux_manuels()
+        self._creer_section_status()
         self._creer_section_stats()
     
-    def _creer_titre(self) -> None:
-        """Crée le titre du panneau"""
-        titre_frame = tk.Frame(self, bg=COULEURS.bg_panel)
-        titre_frame.pack(fill=tk.X, pady=(15, 20))
+    def _creer_header(self) -> None:
+        """En-tête du panneau"""
+        header = tk.Frame(self, bg=COULEURS.bg_dark, height=80)
+        header.pack(fill=tk.X)
+        header.pack_propagate(False)
         
-        # Icône et titre
-        titre = tk.Label(
-            titre_frame,
-            text="🚦 PANNEAU DE CONTRÔLE",
-            font=('Helvetica', 13, 'bold'),
-            bg=COULEURS.bg_panel,
+        title_frame = tk.Frame(header, bg=COULEURS.bg_dark)
+        title_frame.place(relx=0.5, rely=0.5, anchor='center')
+        
+        tk.Label(
+            title_frame,
+            text="🚦",
+            font=('Segoe UI Emoji', 24),
+            bg=COULEURS.bg_dark,
             fg=COULEURS.accent
-        )
-        titre.pack()
+        ).pack()
         
-        # Sous-titre
-        sous_titre = tk.Label(
-            titre_frame,
-            text="Ville de Thiès",
-            font=('Helvetica', 9, 'italic'),
-            bg=COULEURS.bg_panel,
-            fg=COULEURS.text_secondary
-        )
-        sous_titre.pack()
+        tk.Label(
+            title_frame,
+            text="CONTRÔLE",
+            font=('Segoe UI', 11, 'bold'),
+            bg=COULEURS.bg_dark,
+            fg=COULEURS.text_primary
+        ).pack()
     
     def _creer_section_simulation(self) -> None:
-        """Crée la section des boutons de simulation"""
-        frame = tk.Frame(self, bg=COULEURS.bg_panel)
-        frame.pack(fill=tk.X, padx=15, pady=5)
+        """Section boutons de simulation"""
+        section = self._creer_section("SIMULATION")
         
-        # Titre de section
-        tk.Label(
-            frame,
-            text="SIMULATION",
-            font=('Helvetica', 10, 'bold'),
-            bg=COULEURS.bg_panel,
-            fg=COULEURS.text_primary
-        ).pack(anchor='w', pady=(0, 8))
+        btn_grid = tk.Frame(section, bg=COULEURS.bg_panel)
+        btn_grid.pack(fill=tk.X, pady=5)
         
-        # Ligne 1: Play et Pause
-        btn_frame1 = tk.Frame(frame, bg=COULEURS.bg_panel)
-        btn_frame1.pack(fill=tk.X, pady=2)
+        btn_grid.columnconfigure(0, weight=1)
+        btn_grid.columnconfigure(1, weight=1)
         
-        self.btn_play = tk.Button(
-            btn_frame1,
-            text="▶ PLAY",
-            command=self._on_play,
-            font=('Helvetica', 10, 'bold'),
-            width=11,
-            height=2,
-            relief=tk.FLAT,
-            cursor='hand2',
-            **BoutonStyle.PLAY
+        self.btn_play = self._creer_bouton(
+            btn_grid, "▶  PLAY", COULEURS.success, self._on_play
         )
-        self.btn_play.pack(side=tk.LEFT, padx=(0, 5))
+        self.btn_play.grid(row=0, column=0, padx=3, pady=3, sticky='ew')
         
-        self.btn_pause = tk.Button(
-            btn_frame1,
-            text="⏸ PAUSE",
-            command=self._on_pause,
-            font=('Helvetica', 10, 'bold'),
-            width=11,
-            height=2,
-            relief=tk.FLAT,
-            cursor='hand2',
-            state=tk.DISABLED,
-            **BoutonStyle.PAUSE
+        self.btn_pause = self._creer_bouton(
+            btn_grid, "⏸  PAUSE", COULEURS.warning, self._on_pause, state=tk.DISABLED
         )
-        self.btn_pause.pack(side=tk.LEFT)
+        self.btn_pause.grid(row=0, column=1, padx=3, pady=3, sticky='ew')
         
-        # Ligne 2: Stop et Reset
-        btn_frame2 = tk.Frame(frame, bg=COULEURS.bg_panel)
-        btn_frame2.pack(fill=tk.X, pady=2)
-        
-        self.btn_stop = tk.Button(
-            btn_frame2,
-            text="⏹ STOP",
-            command=self._on_stop,
-            font=('Helvetica', 10, 'bold'),
-            width=11,
-            height=2,
-            relief=tk.FLAT,
-            cursor='hand2',
-            state=tk.DISABLED,
-            **BoutonStyle.STOP
+        self.btn_stop = self._creer_bouton(
+            btn_grid, "⏹  STOP", COULEURS.danger, self._on_stop, state=tk.DISABLED
         )
-        self.btn_stop.pack(side=tk.LEFT, padx=(0, 5))
+        self.btn_stop.grid(row=1, column=0, padx=3, pady=3, sticky='ew')
         
-        self.btn_reset = tk.Button(
-            btn_frame2,
-            text="🔄 RESET",
-            command=self._on_reset,
-            font=('Helvetica', 10, 'bold'),
-            width=11,
-            height=2,
-            relief=tk.FLAT,
-            cursor='hand2',
-            **BoutonStyle.RESET
+        self.btn_reset = self._creer_bouton(
+            btn_grid, "🔄  RESET", COULEURS.accent, self._on_reset
         )
-        self.btn_reset.pack(side=tk.LEFT)
+        self.btn_reset.grid(row=1, column=1, padx=3, pady=3, sticky='ew')
     
     def _creer_section_scenarios(self) -> None:
-        """Crée la section de sélection des scénarios"""
-        frame = tk.Frame(self, bg=COULEURS.bg_panel)
-        frame.pack(fill=tk.X, padx=15, pady=5)
+        """Section sélection scénario"""
+        section = self._creer_section("SCÉNARIO")
         
-        # Titre de section
-        tk.Label(
-            frame,
-            text="SCÉNARIOS",
-            font=('Helvetica', 10, 'bold'),
-            bg=COULEURS.bg_panel,
-            fg=COULEURS.text_primary
-        ).pack(anchor='w', pady=(0, 8))
-        
-        # Boutons radio pour chaque scénario
-        scenarios_info = [
-            (Scenario.NORMAL, "🚗", "Flux régulier"),
-            (Scenario.HEURE_POINTE, "🚦", "Trafic dense"),
-            (Scenario.NUIT, "🌙", "Clignotant"),
-            (Scenario.MANUEL, "🎮", "Contrôle total")
-        ]
-        
-        for scenario, emoji, desc in scenarios_info:
-            rb_frame = tk.Frame(frame, bg=COULEURS.bg_panel)
-            rb_frame.pack(fill=tk.X, pady=1)
+        for scenario in Scenario:
+            frame = tk.Frame(section, bg=COULEURS.bg_panel)
+            frame.pack(fill=tk.X, pady=2)
             
             rb = tk.Radiobutton(
-                rb_frame,
-                text=f"{emoji} {scenario.value}",
+                frame,
+                text=f"  {scenario.emoji}  {scenario.value}",
                 variable=self.scenario_var,
                 value=scenario.value,
                 command=self._on_scenario_change,
                 bg=COULEURS.bg_panel,
-                fg=COULEURS.text_secondary,
+                fg=COULEURS.text_primary,
                 selectcolor=COULEURS.bg_card,
                 activebackground=COULEURS.bg_panel,
-                activeforeground=COULEURS.text_primary,
-                font=('Helvetica', 9),
+                activeforeground=COULEURS.accent,
+                font=('Segoe UI', 10),
                 cursor='hand2',
-                anchor='w'
+                anchor='w',
+                indicatoron=True,
+                bd=0,
+                highlightthickness=0
             )
-            rb.pack(side=tk.LEFT)
-            
-            # Description
-            tk.Label(
-                rb_frame,
-                text=f"({desc})",
-                font=('Helvetica', 8),
-                bg=COULEURS.bg_panel,
-                fg='#7F8C8D'
-            ).pack(side=tk.LEFT, padx=(5, 0))
+            rb.pack(fill=tk.X, padx=5)
     
-    def _creer_section_manuel(self) -> None:
-        """Crée la section de contrôle manuel des feux"""
-        frame = tk.Frame(self, bg=COULEURS.bg_panel)
-        frame.pack(fill=tk.X, padx=15, pady=5)
+    def _creer_section_feux_manuels(self) -> None:
+        """Section contrôle manuel des feux"""
+        section = self._creer_section("CONTRÔLE MANUEL")
         
-        # Titre de section
-        tk.Label(
-            frame,
-            text="CONTRÔLE MANUEL DES FEUX",
-            font=('Helvetica', 10, 'bold'),
+        self.label_manuel = tk.Label(
+            section,
+            text="Sélectionnez 'Mode manuel' pour activer",
+            font=('Segoe UI', 8),
             bg=COULEURS.bg_panel,
-            fg=COULEURS.text_primary
-        ).pack(anchor='w', pady=(0, 8))
-        
-        # Info
-        self.label_manuel_info = tk.Label(
-            frame,
-            text="⚠️ Activez le mode manuel",
-            font=('Helvetica', 8, 'italic'),
-            bg=COULEURS.bg_panel,
-            fg='#F39C12'
+            fg=COULEURS.text_secondary
         )
-        self.label_manuel_info.pack(anchor='w', pady=(0, 5))
+        self.label_manuel.pack(anchor='w', pady=(0, 8))
         
-        # Voie 1 (Nord-Sud)
-        v1_frame = tk.Frame(frame, bg=COULEURS.bg_panel)
+        # Voie 1
+        v1_frame = tk.Frame(section, bg=COULEURS.bg_panel)
         v1_frame.pack(fill=tk.X, pady=3)
         
         tk.Label(
             v1_frame,
-            text="Voie 1 (N↔S):",
-            font=('Helvetica', 9),
+            text="Voie N↔S :",
+            font=('Segoe UI', 9),
             bg=COULEURS.bg_panel,
             fg=COULEURS.text_secondary,
-            width=12,
+            width=10,
             anchor='w'
         ).pack(side=tk.LEFT)
         
-        self.btns_v1 = self._creer_boutons_feu(v1_frame, 1)
+        self._creer_boutons_feu(v1_frame, 1)
         
-        # Voie 2 (Est-Ouest)
-        v2_frame = tk.Frame(frame, bg=COULEURS.bg_panel)
+        # Voie 2
+        v2_frame = tk.Frame(section, bg=COULEURS.bg_panel)
         v2_frame.pack(fill=tk.X, pady=3)
         
         tk.Label(
             v2_frame,
-            text="Voie 2 (E↔O):",
-            font=('Helvetica', 9),
+            text="Voie E↔O :",
+            font=('Segoe UI', 9),
             bg=COULEURS.bg_panel,
             fg=COULEURS.text_secondary,
-            width=12,
+            width=10,
             anchor='w'
         ).pack(side=tk.LEFT)
         
-        self.btns_v2 = self._creer_boutons_feu(v2_frame, 2)
+        self._creer_boutons_feu(v2_frame, 2)
     
-    def _creer_boutons_feu(self, parent: tk.Widget, voie: int) -> Dict[str, tk.Button]:
-        """
-        Crée les boutons de contrôle de feu pour une voie.
+    def _creer_section_status(self) -> None:
+        """Section status des feux"""
+        section = self._creer_section("ÉTAT DES FEUX")
         
-        Args:
-            parent: Widget parent
-            voie: Numéro de la voie
-            
-        Returns:
-            Dictionnaire des boutons créés
-        """
-        btns = {}
+        card = tk.Frame(section, bg=COULEURS.bg_card, padx=15, pady=10)
+        card.pack(fill=tk.X)
         
-        couleurs_feu = [
-            ('vert', '🟢', EtatFeu.VERT),
-            ('orange', '🟡', EtatFeu.ORANGE),
-            ('rouge', '🔴', EtatFeu.ROUGE)
+        self.label_feu_v1 = tk.Label(
+            card,
+            text="Voie N↔S : 🟢 VERT",
+            font=('Segoe UI', 11, 'bold'),
+            bg=COULEURS.bg_card,
+            fg=COULEURS.success
+        )
+        self.label_feu_v1.pack(anchor='w', pady=2)
+        
+        self.label_feu_v2 = tk.Label(
+            card,
+            text="Voie E↔O : 🔴 ROUGE",
+            font=('Segoe UI', 11, 'bold'),
+            bg=COULEURS.bg_card,
+            fg=COULEURS.danger
+        )
+        self.label_feu_v2.pack(anchor='w', pady=2)
+        
+        tk.Frame(card, bg=COULEURS.text_secondary, height=1).pack(fill=tk.X, pady=8)
+        
+        self.label_status = tk.Label(
+            card,
+            text="⏹  ARRÊTÉ",
+            font=('Segoe UI', 14, 'bold'),
+            bg=COULEURS.bg_card,
+            fg=COULEURS.danger
+        )
+        self.label_status.pack(pady=5)
+    
+    def _creer_section_stats(self) -> None:
+        """Section statistiques"""
+        section = self._creer_section("STATISTIQUES")
+        
+        stats_frame = tk.Frame(section, bg=COULEURS.bg_panel)
+        stats_frame.pack(fill=tk.X)
+        
+        self.label_voitures = tk.Label(
+            stats_frame,
+            text="🚗  Véhicules : 0",
+            font=('Segoe UI', 10),
+            bg=COULEURS.bg_panel,
+            fg=COULEURS.text_primary
+        )
+        self.label_voitures.pack(anchor='w', pady=1)
+        
+        self.label_temps = tk.Label(
+            stats_frame,
+            text="⏱  Temps : 00:00",
+            font=('Segoe UI', 10),
+            bg=COULEURS.bg_panel,
+            fg=COULEURS.text_primary
+        )
+        self.label_temps.pack(anchor='w', pady=1)
+    
+    def _creer_section(self, titre: str) -> tk.Frame:
+        """Crée une section avec titre"""
+        container = tk.Frame(self, bg=COULEURS.bg_panel)
+        container.pack(fill=tk.X, padx=15, pady=10)
+        
+        title_label = tk.Label(
+            container,
+            text=titre,
+            font=('Segoe UI', 9, 'bold'),
+            bg=COULEURS.bg_panel,
+            fg=COULEURS.accent
+        )
+        title_label.pack(anchor='w', pady=(0, 8))
+        
+        return container
+    
+    def _creer_bouton(self, parent, text: str, color: str, 
+                      command: Callable, state=tk.NORMAL) -> tk.Button:
+        """Crée un bouton stylisé"""
+        btn = tk.Button(
+            parent,
+            text=text,
+            command=command,
+            font=('Segoe UI', 10, 'bold'),
+            bg=color,
+            fg='white',
+            activebackground=color,
+            activeforeground='white',
+            relief=tk.FLAT,
+            cursor='hand2',
+            height=2,
+            state=state,
+            bd=0
+        )
+        
+        original_color = color
+        
+        def on_enter(e):
+            if btn['state'] != tk.DISABLED:
+                btn.configure(bg=self._lighten_color(original_color))
+        
+        def on_leave(e):
+            if btn['state'] != tk.DISABLED:
+                btn.configure(bg=original_color)
+        
+        btn.bind('<Enter>', on_enter)
+        btn.bind('<Leave>', on_leave)
+        
+        return btn
+    
+    def _lighten_color(self, hex_color: str) -> str:
+        """Éclaircit une couleur hex"""
+        hex_color = hex_color.lstrip('#')
+        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        r = min(255, int(r * 1.2))
+        g = min(255, int(g * 1.2))
+        b = min(255, int(b * 1.2))
+        return f'#{r:02x}{g:02x}{b:02x}'
+    
+    def _creer_boutons_feu(self, parent: tk.Widget, voie: int) -> None:
+        """Crée les boutons de feu pour une voie"""
+        feux = [
+            ('🟢', EtatFeu.VERT, '#27AE60'),
+            ('🟡', EtatFeu.ORANGE, '#F39C12'),
+            ('🔴', EtatFeu.ROUGE, '#E74C3C')
         ]
         
-        for nom, emoji, etat in couleurs_feu:
+        for emoji, etat, color in feux:
             btn = tk.Button(
                 parent,
                 text=emoji,
                 command=lambda v=voie, e=etat: self._on_feu_manuel(v, e),
-                font=('Helvetica', 14),
-                width=2,
-                height=1,
+                font=('Segoe UI Emoji', 16),
+                bg=COULEURS.bg_card,
+                activebackground=color,
                 relief=tk.FLAT,
                 cursor='hand2',
-                bg=COULEURS.bg_card,
-                activebackground=COULEURS.bg_dark
+                width=3,
+                height=1,
+                bd=0
             )
-            btn.pack(side=tk.LEFT, padx=2)
-            btns[nom] = btn
-        
-        return btns
+            btn.pack(side=tk.LEFT, padx=3)
     
-    def _creer_section_etat(self) -> None:
-        """Crée la section d'affichage de l'état actuel"""
-        frame = tk.Frame(self, bg=COULEURS.bg_card, relief=tk.RIDGE, bd=1)
-        frame.pack(fill=tk.X, padx=15, pady=10)
-        
-        # Titre
-        tk.Label(
-            frame,
-            text="ÉTAT ACTUEL",
-            font=('Helvetica', 10, 'bold'),
-            bg=COULEURS.bg_card,
-            fg=COULEURS.text_primary
-        ).pack(anchor='w', padx=10, pady=(8, 5))
-        
-        # État des feux
-        feux_frame = tk.Frame(frame, bg=COULEURS.bg_card)
-        feux_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        self.label_feu_v1 = tk.Label(
-            feux_frame,
-            text="Voie 1: 🟢 VERT",
-            font=('Helvetica', 10),
-            bg=COULEURS.bg_card,
-            fg='#2ECC71'
-        )
-        self.label_feu_v1.pack(anchor='w')
-        
-        self.label_feu_v2 = tk.Label(
-            feux_frame,
-            text="Voie 2: 🔴 ROUGE",
-            font=('Helvetica', 10),
-            bg=COULEURS.bg_card,
-            fg='#E74C3C'
-        )
-        self.label_feu_v2.pack(anchor='w')
-        
-        # Séparateur
-        ttk.Separator(frame, orient='horizontal').pack(fill=tk.X, padx=10, pady=5)
-        
-        # Status de la simulation
-        self.label_status = tk.Label(
-            frame,
-            text="⏹ ARRÊTÉ",
-            font=('Helvetica', 12, 'bold'),
-            bg=COULEURS.bg_card,
-            fg='#E74C3C'
-        )
-        self.label_status.pack(pady=(0, 8))
-    
-    def _creer_section_stats(self) -> None:
-        """Crée la section des statistiques"""
-        frame = tk.Frame(self, bg=COULEURS.bg_panel)
-        frame.pack(fill=tk.X, padx=15, pady=5)
-        
-        # Compteur de voitures
-        self.label_voitures = tk.Label(
-            frame,
-            text="🚗 Voitures: 0",
-            font=('Helvetica', 10),
-            bg=COULEURS.bg_panel,
-            fg=COULEURS.text_secondary
-        )
-        self.label_voitures.pack(anchor='w', pady=2)
-        
-        # Temps écoulé
-        self.label_temps = tk.Label(
-            frame,
-            text="⏱ Temps: 00:00",
-            font=('Helvetica', 10),
-            bg=COULEURS.bg_panel,
-            fg=COULEURS.text_secondary
-        )
-        self.label_temps.pack(anchor='w', pady=2)
-        
-        # Scénario actif
-        self.label_scenario = tk.Label(
-            frame,
-            text="📋 Scénario: Normal",
-            font=('Helvetica', 10),
-            bg=COULEURS.bg_panel,
-            fg=COULEURS.text_secondary
-        )
-        self.label_scenario.pack(anchor='w', pady=2)
-    
-    def _creer_separateur(self) -> None:
-        """Crée un séparateur horizontal"""
-        sep = ttk.Separator(self, orient='horizontal')
-        sep.pack(fill=tk.X, padx=20, pady=10)
-    
-    # ========================================================================
-    # CALLBACKS DES BOUTONS
-    # ========================================================================
+    # === CALLBACKS ===
     
     def _on_play(self) -> None:
-        """Callback du bouton Play"""
         if 'play' in self.callbacks:
             self.callbacks['play']()
     
     def _on_pause(self) -> None:
-        """Callback du bouton Pause"""
         if 'pause' in self.callbacks:
             self.callbacks['pause']()
     
     def _on_stop(self) -> None:
-        """Callback du bouton Stop"""
         if 'stop' in self.callbacks:
             self.callbacks['stop']()
     
     def _on_reset(self) -> None:
-        """Callback du bouton Reset"""
         if 'reset' in self.callbacks:
             self.callbacks['reset']()
     
     def _on_scenario_change(self) -> None:
-        """Callback du changement de scénario"""
         if 'scenario_change' in self.callbacks:
             self.callbacks['scenario_change'](self.scenario_var.get())
         
-        # Mettre à jour l'affichage du mode manuel
         is_manuel = self.scenario_var.get() == Scenario.MANUEL.value
         if is_manuel:
-            self.label_manuel_info.config(
-                text="✅ Mode manuel actif",
-                fg='#2ECC71'
-            )
+            self.label_manuel.config(text="✓ Mode manuel actif", fg=COULEURS.success)
         else:
-            self.label_manuel_info.config(
-                text="⚠️ Activez le mode manuel",
-                fg='#F39C12'
+            self.label_manuel.config(
+                text="Sélectionnez 'Mode manuel' pour activer",
+                fg=COULEURS.text_secondary
             )
     
     def _on_feu_manuel(self, voie: int, etat: EtatFeu) -> None:
-        """
-        Callback du contrôle manuel des feux.
-        
-        Args:
-            voie: Numéro de la voie
-            etat: État à forcer
-        """
-        # Vérifier si en mode manuel
         if self.scenario_var.get() != Scenario.MANUEL.value:
-            messagebox.showwarning(
-                "Mode manuel requis",
-                "Veuillez d'abord sélectionner le mode manuel\n"
-                "pour contrôler les feux manuellement."
+            messagebox.showinfo(
+                "Mode manuel",
+                "Activez d'abord le mode manuel\npour contrôler les feux."
             )
             return
         
         if 'feu_manuel' in self.callbacks:
             self.callbacks['feu_manuel'](voie, etat)
     
-    # ========================================================================
-    # MÉTHODES DE MISE À JOUR
-    # ========================================================================
+    # === MISES À JOUR ===
     
     def update_etat_feux(self, etat_v1: EtatFeu, etat_v2: EtatFeu) -> None:
-        """
-        Met à jour l'affichage des états des feux.
-        
-        Args:
-            etat_v1: État du feu voie 1
-            etat_v2: État du feu voie 2
-        """
-        # Mapping état -> (texte, couleur)
-        etats_affichage = {
-            EtatFeu.VERT: ('🟢 VERT', '#2ECC71'),
-            EtatFeu.ORANGE: ('🟡 ORANGE', '#F39C12'),
-            EtatFeu.ROUGE: ('🔴 ROUGE', '#E74C3C'),
-            EtatFeu.ORANGE_CLIGNOTANT: ('🟡 CLIGNOTANT', '#F39C12'),
-            EtatFeu.ETEINT: ('⚫ ÉTEINT', '#7F8C8D')
+        """Met à jour l'affichage des feux"""
+        mapping = {
+            EtatFeu.VERT: ('🟢 VERT', COULEURS.success),
+            EtatFeu.ORANGE: ('🟡 ORANGE', COULEURS.warning),
+            EtatFeu.ROUGE: ('🔴 ROUGE', COULEURS.danger),
+            EtatFeu.ORANGE_CLIGNOTANT: ('🟡 CLIGNOTANT', COULEURS.warning),
+            EtatFeu.ETEINT: ('⚫ ÉTEINT', COULEURS.text_secondary)
         }
         
-        texte_v1, couleur_v1 = etats_affichage.get(
-            etat_v1, ('❓ INCONNU', '#BDC3C7')
-        )
-        texte_v2, couleur_v2 = etats_affichage.get(
-            etat_v2, ('❓ INCONNU', '#BDC3C7')
-        )
+        txt1, col1 = mapping.get(etat_v1, ('?', COULEURS.text_secondary))
+        txt2, col2 = mapping.get(etat_v2, ('?', COULEURS.text_secondary))
         
-        self.label_feu_v1.config(text=f"Voie 1: {texte_v1}", fg=couleur_v1)
-        self.label_feu_v2.config(text=f"Voie 2: {texte_v2}", fg=couleur_v2)
+        self.label_feu_v1.config(text=f"Voie N↔S : {txt1}", fg=col1)
+        self.label_feu_v2.config(text=f"Voie E↔O : {txt2}", fg=col2)
     
-    def update_status(self, status: str, en_cours: bool, en_pause: bool) -> None:
-        """
-        Met à jour le status de la simulation.
-        
-        Args:
-            status: Texte du status
-            en_cours: True si simulation en cours
-            en_pause: True si simulation en pause
-        """
+    def update_status(self, en_cours: bool, en_pause: bool) -> None:
+        """Met à jour le status"""
         if en_cours and not en_pause:
-            self.label_status.config(text="▶ EN COURS", fg='#2ECC71')
+            self.label_status.config(text="▶  EN COURS", fg=COULEURS.success)
             self.btn_play.config(state=tk.DISABLED)
             self.btn_pause.config(state=tk.NORMAL)
             self.btn_stop.config(state=tk.NORMAL)
         elif en_cours and en_pause:
-            self.label_status.config(text="⏸ EN PAUSE", fg='#F39C12')
+            self.label_status.config(text="⏸  EN PAUSE", fg=COULEURS.warning)
             self.btn_play.config(state=tk.NORMAL)
             self.btn_pause.config(state=tk.DISABLED)
             self.btn_stop.config(state=tk.NORMAL)
         else:
-            self.label_status.config(text="⏹ ARRÊTÉ", fg='#E74C3C')
+            self.label_status.config(text="⏹  ARRÊTÉ", fg=COULEURS.danger)
             self.btn_play.config(state=tk.NORMAL)
             self.btn_pause.config(state=tk.DISABLED)
             self.btn_stop.config(state=tk.DISABLED)
     
-    def update_stats(self, nb_voitures: int, temps_secondes: int,
-                     scenario: str) -> None:
-        """
-        Met à jour les statistiques affichées.
-        
-        Args:
-            nb_voitures: Nombre de voitures actuelles
-            temps_secondes: Temps écoulé en secondes
-            scenario: Nom du scénario actif
-        """
-        # Voitures
-        self.label_voitures.config(text=f"🚗 Voitures: {nb_voitures}")
-        
-        # Temps formaté
-        minutes = temps_secondes // 60
-        secondes = temps_secondes % 60
-        self.label_temps.config(text=f"⏱ Temps: {minutes:02d}:{secondes:02d}")
-        
-        # Scénario
-        self.label_scenario.config(text=f"📋 Scénario: {scenario}")
-    
-    def get_scenario_selectionne(self) -> str:
-        """Retourne le scénario actuellement sélectionné"""
-        return self.scenario_var.get()
+    def update_stats(self, nb_voitures: int, temps_sec: int) -> None:
+        """Met à jour les statistiques"""
+        self.label_voitures.config(text=f"🚗  Véhicules : {nb_voitures}")
+        m, s = divmod(temps_sec, 60)
+        self.label_temps.config(text=f"⏱  Temps : {m:02d}:{s:02d}")
 
 
 class InterfaceGraphique:
-    """
-    Interface graphique principale de l'application.
-    Coordonne le canvas Turtle et le panneau de contrôle.
-    """
+    """Interface principale redimensionnable"""
     
-    def __init__(self, titre: str = "Simulateur de Carrefour - Ville de Thiès"):
-        """
-        Initialise l'interface graphique.
+    PANEL_WIDTH = 280
+    
+    def __init__(self, titre: str = "Simulateur de Carrefour - Thiès"):
+        # Initialiser canvas_size AVANT tout le reste
+        self.canvas_size = 700
+        self.panneau = None
+        self.callbacks = {}
+        self.is_fullscreen = False
         
-        Args:
-            titre: Titre de la fenêtre
-        """
-        # Fenêtre principale
+        # Créer la fenêtre
         self.root = tk.Tk()
         self.root.title(f"🚦 {titre}")
-        self.root.geometry("1050x800")
-        self.root.resizable(False, False)
         self.root.configure(bg=COULEURS.bg_dark)
         
-        # Callbacks (à définir par l'application principale)
-        self.callbacks: Dict[str, Callable] = {}
+        # Dimensions écran
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
         
-        # Créer l'interface
-        self._creer_interface()
+        # Taille initiale (90% de l'écran)
+        w = int(screen_w * 0.9)
+        h = int(screen_h * 0.85)
+        x = (screen_w - w) // 2
+        y = (screen_h - h) // 2 - 30
         
-        # Référence au screen Turtle (sera initialisé plus tard)
-        self.turtle_screen = None
+        self.root.geometry(f"{w}x{h}+{x}+{y}")
+        self.root.minsize(1000, 700)
+        
+        # Fullscreen
+        self.root.bind('<F11>', lambda e: self._toggle_fullscreen())
+        self.root.bind('<Escape>', lambda e: self._exit_fullscreen())
+        
+        # Créer le layout
+        self._creer_layout()
     
-    def _creer_interface(self) -> None:
-        """Crée la structure de l'interface"""
-        # Frame principal
-        self.main_frame = tk.Frame(self.root, bg=COULEURS.bg_dark)
-        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+    def _toggle_fullscreen(self) -> None:
+        self.is_fullscreen = not self.is_fullscreen
+        self.root.attributes('-fullscreen', self.is_fullscreen)
+    
+    def _exit_fullscreen(self) -> None:
+        self.is_fullscreen = False
+        self.root.attributes('-fullscreen', False)
+    
+    def _creer_layout(self) -> None:
+        """Crée le layout principal"""
+        # Container principal
+        self.main = tk.Frame(self.root, bg=COULEURS.bg_dark)
+        self.main.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # Frame gauche pour le canvas Turtle
-        self.left_frame = tk.Frame(self.main_frame, bg=COULEURS.bg_dark)
+        # Frame gauche pour canvas
+        self.left_frame = tk.Frame(self.main, bg=COULEURS.bg_dark)
         self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Canvas pour Turtle
+        # Container pour centrer le canvas
+        self.canvas_container = tk.Frame(self.left_frame, bg=COULEURS.bg_dark)
+        self.canvas_container.pack(expand=True)
+        
+        # Canvas Turtle
         self.canvas = tk.Canvas(
-            self.left_frame,
-            width=730,
-            height=730,
+            self.canvas_container,
+            width=self.canvas_size,
+            height=self.canvas_size,
             bg='#27AE60',
-            highlightthickness=3,
+            highlightthickness=2,
             highlightbackground=COULEURS.accent
         )
-        self.canvas.pack(padx=5, pady=5)
+        self.canvas.pack()
         
-        # Frame droite pour les contrôles (sera créé avec les callbacks)
-        self.right_frame = tk.Frame(self.main_frame, bg=COULEURS.bg_dark)
+        # Frame droite pour panneau
+        self.right_frame = tk.Frame(
+            self.main,
+            bg=COULEURS.bg_panel,
+            width=self.PANEL_WIDTH
+        )
         self.right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
-    
-    def initialiser_panneau_controle(self, callbacks: Dict[str, Callable]) -> PanneauControle:
-        """
-        Initialise le panneau de contrôle avec les callbacks.
+        self.right_frame.pack_propagate(False)
         
-        Args:
-            callbacks: Dictionnaire des fonctions de callback
+        # Bind resize
+        self.root.bind('<Configure>', self._on_resize)
+    
+    def _on_resize(self, event=None) -> None:
+        """Gère le redimensionnement"""
+        if event and event.widget == self.root:
+            self.root.after(100, self._update_canvas_size)
+    
+    def _update_canvas_size(self) -> None:
+        """Met à jour la taille du canvas"""
+        try:
+            avail_w = self.root.winfo_width() - self.PANEL_WIDTH - 50
+            avail_h = self.root.winfo_height() - 50
             
-        Returns:
-            Instance du panneau de contrôle
-        """
+            size = min(avail_w, avail_h)
+            size = max(500, min(size, 800))
+            
+            if abs(size - self.canvas_size) > 20:
+                self.canvas_size = size
+                self.canvas.config(width=size, height=size)
+        except:
+            pass
+    
+    def initialiser_panneau(self, callbacks: Dict[str, Callable]) -> PanneauControle:
+        """Initialise le panneau de contrôle avec les callbacks"""
         self.callbacks = callbacks
         self.panneau = PanneauControle(self.right_frame, callbacks)
-        self.panneau.pack(fill=tk.Y, expand=True)
+        self.panneau.pack(fill=tk.BOTH, expand=True)
         return self.panneau
     
     def get_canvas(self) -> tk.Canvas:
-        """Retourne le canvas Tkinter pour Turtle"""
+        """Retourne le canvas Tkinter"""
         return self.canvas
     
+    def get_canvas_size(self) -> int:
+        """Retourne la taille du canvas"""
+        return self.canvas_size
+    
     def set_on_close(self, callback: Callable) -> None:
-        """
-        Définit le callback de fermeture de fenêtre.
-        
-        Args:
-            callback: Fonction à appeler à la fermeture
-        """
+        """Définit le callback de fermeture"""
         self.root.protocol("WM_DELETE_WINDOW", callback)
     
+    def after(self, ms: int, callback: Callable) -> str:
+        """Planifie une exécution"""
+        return self.root.after(ms, callback)
+    
+    def after_cancel(self, id: str) -> None:
+        """Annule un timer"""
+        self.root.after_cancel(id)
+    
     def run(self) -> None:
-        """Lance la boucle principale Tkinter"""
+        """Lance la boucle principale"""
         self.root.mainloop()
     
-    def after(self, delay_ms: int, callback: Callable) -> str:
-        """
-        Planifie l'exécution d'une fonction.
-        
-        Args:
-            delay_ms: Délai en millisecondes
-            callback: Fonction à exécuter
-            
-        Returns:
-            ID du timer
-        """
-        return self.root.after(delay_ms, callback)
-    
-    def after_cancel(self, timer_id: str) -> None:
-        """
-        Annule un timer planifié.
-        
-        Args:
-            timer_id: ID du timer à annuler
-        """
-        self.root.after_cancel(timer_id)
-    
     def destroy(self) -> None:
-        """Détruit la fenêtre"""
+        """Ferme la fenêtre"""
         self.root.destroy()
 
 
-# ============================================================================
-# TEST DU MODULE
-# ============================================================================
-
 if __name__ == "__main__":
-    print("=" * 60)
-    print("TEST DU MODULE gui.py")
-    print("=" * 60)
+    print("Test GUI...")
     
-    # Callbacks de test
-    def test_callback(name):
-        def callback(*args):
-            print(f"[TEST] Callback '{name}' appelé avec args: {args}")
-        return callback
+    def dummy(*args):
+        print(f"Callback: {args}")
     
-    callbacks = {
-        'play': test_callback('play'),
-        'pause': test_callback('pause'),
-        'stop': test_callback('stop'),
-        'reset': test_callback('reset'),
-        'scenario_change': test_callback('scenario_change'),
-        'feu_manuel': test_callback('feu_manuel')
-    }
+    gui = InterfaceGraphique()
+    gui.initialiser_panneau({
+        'play': dummy,
+        'pause': dummy,
+        'stop': dummy,
+        'reset': dummy,
+        'scenario_change': dummy,
+        'feu_manuel': dummy
+    })
     
-    # Créer l'interface
-    gui = InterfaceGraphique("Test GUI")
-    panneau = gui.initialiser_panneau_controle(callbacks)
-    
-    # Test des mises à jour
-    def test_updates():
-        panneau.update_etat_feux(EtatFeu.VERT, EtatFeu.ROUGE)
-        panneau.update_stats(5, 125, "Circulation normale")
-        panneau.update_status("En cours", True, False)
-    
-    gui.after(1000, test_updates)
-    
-    print("\n[TEST] Interface créée. Fermez la fenêtre pour terminer.")
     gui.run()
-    
-    print("\n[TEST] Tests terminés avec succès ✅")
