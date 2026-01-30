@@ -1,5 +1,5 @@
 """
-vehicles.py - Gestion des véhicules
+vehicles.py - Véhicules réalistes (sans ombres)
 Projet Feu Tricolore - Ville de Thiès
 """
 
@@ -8,45 +8,49 @@ import random
 import math
 from typing import List, Optional, Callable, Tuple
 from dataclasses import dataclass, field
+from enum import Enum
 
 from scenarios import (
     EtatFeu, Scenario, Direction,
-    get_config, ConfigScenario,
-    COULEURS, COULEURS_VOITURES, DIMENSIONS,
+    get_config,
+    COULEURS_VOITURES, DIMENSIONS,
     get_position_depart
 )
 
 
+class TypeVehicule(Enum):
+    """Types de véhicules"""
+    BERLINE = "berline"
+    SUV = "suv"
+    COMPACT = "compact"
+
+
 @dataclass
 class Voiture:
-    """Représente un véhicule"""
+    """Véhicule réaliste"""
     
     screen: turtle.TurtleScreen = field(repr=False)
     id: int
     direction: Direction
     x: float
     y: float
-    vitesse: float = 0.0
-    vitesse_max: float = 2.5
-    acceleration: float = 0.15
-    deceleration: float = 0.25
+    
+    type_vehicule: TypeVehicule = TypeVehicule.BERLINE
     couleur: str = "#3498DB"
     
-    # États
+    vitesse: float = 0.0
+    vitesse_max: float = 2.5
+    acceleration: float = 0.12
+    deceleration: float = 0.20
+    
     en_arret: bool = False
     a_passe_feu: bool = False
     dans_intersection: bool = False
     
-    # Flags logging
     logged_arret: bool = False
     logged_redemarrage: bool = False
     
-    # Turtle
     _turtle: turtle.RawTurtle = field(default=None, repr=False, compare=False)
-    
-    # Dimensions
-    largeur: float = DIMENSIONS.voiture_largeur
-    longueur: float = DIMENSIONS.voiture_longueur
     
     def __post_init__(self):
         if self.screen:
@@ -54,58 +58,66 @@ class Voiture:
             self._turtle.hideturtle()
             self._turtle.speed(0)
             self._turtle.penup()
+        
+        self._set_dimensions()
+    
+    def _set_dimensions(self) -> None:
+        """Dimensions selon le type"""
+        dims = {
+            TypeVehicule.BERLINE: (42, 22),
+            TypeVehicule.SUV: (48, 26),
+            TypeVehicule.COMPACT: (35, 20),
+        }
+        self.longueur, self.largeur = dims.get(self.type_vehicule, (42, 22))
     
     def dessiner(self) -> None:
-        """Dessine la voiture"""
+        """Dessine le véhicule"""
         if not self._turtle:
             return
         
-        t = self._turtle
-        t.clear()
-        
         angle = self.direction.angle
+        self._turtle.clear()
+        
+        self._dessiner_corps(angle)
+        self._dessiner_toit(angle)
+        self._dessiner_vitres(angle)
+        self._dessiner_phares(angle)
+    
+    def _dessiner_corps(self, angle: float) -> None:
+        """Corps principal"""
+        t = self._turtle
+        
+        coins = self._calculer_coins(self.x, self.y, self.longueur, self.largeur, angle)
+        
+        t.fillcolor(self.couleur)
+        t.pencolor('#1A1A1A')
+        t.pensize(2)
+        
+        t.goto(coins[0])
+        t.pendown()
+        t.begin_fill()
+        for coin in coins[1:]:
+            t.goto(coin)
+        t.goto(coins[0])
+        t.end_fill()
+        t.penup()
+    
+    def _dessiner_toit(self, angle: float) -> None:
+        """Toit / cabine"""
+        t = self._turtle
         cos_a = math.cos(math.radians(angle))
         sin_a = math.sin(math.radians(angle))
         
-        # Corps principal
-        self._dessiner_rectangle(
-            self.x, self.y,
-            self.longueur, self.largeur,
-            angle, self.couleur
-        )
+        toit_offset = -self.longueur * 0.08
+        toit_x = self.x + toit_offset * cos_a
+        toit_y = self.y + toit_offset * sin_a
         
-        # Toit / cabine
-        self._dessiner_rectangle(
-            self.x - 3 * cos_a,
-            self.y - 3 * sin_a,
-            self.longueur * 0.5,
-            self.largeur * 0.7,
-            angle, self._assombrir(self.couleur)
-        )
+        toit_longueur = self.longueur * 0.4
+        toit_largeur = self.largeur * 0.7
         
-        # Pare-brise
-        offset = self.longueur * 0.15
-        self._dessiner_rectangle(
-            self.x + offset * cos_a,
-            self.y + offset * sin_a,
-            8, self.largeur * 0.6,
-            angle, '#AED6F1'
-        )
+        coins = self._calculer_coins(toit_x, toit_y, toit_longueur, toit_largeur, angle)
         
-        # Phares avant
-        self._dessiner_phares(angle, avant=True)
-        
-        # Feux arrière
-        self._dessiner_phares(angle, avant=False)
-    
-    def _dessiner_rectangle(self, cx: float, cy: float, 
-                            longueur: float, largeur: float,
-                            angle: float, couleur: str) -> None:
-        """Dessine un rectangle orienté"""
-        t = self._turtle
-        coins = self._calculer_coins(cx, cy, longueur, largeur, angle)
-        
-        t.fillcolor(couleur)
+        t.fillcolor(self._assombrir(self.couleur, 0.75))
         t.pencolor('#1A1A1A')
         t.pensize(1)
         
@@ -118,56 +130,122 @@ class Voiture:
         t.end_fill()
         t.penup()
     
-    def _dessiner_phares(self, angle: float, avant: bool = True) -> None:
-        """Dessine les phares"""
+    def _dessiner_vitres(self, angle: float) -> None:
+        """Vitres avant et arrière"""
         t = self._turtle
         cos_a = math.cos(math.radians(angle))
         sin_a = math.sin(math.radians(angle))
         
-        offset = (self.longueur / 2 - 2) * (1 if avant else -1)
-        couleur = '#F1C40F' if avant else '#E74C3C'
+        # Pare-brise
+        offset = self.longueur * 0.15
+        vx = self.x + offset * cos_a
+        vy = self.y + offset * sin_a
         
+        coins = self._calculer_coins(vx, vy, 5, self.largeur * 0.55, angle)
+        
+        t.fillcolor('#87CEEB')
+        t.pencolor('#5DADE2')
+        t.pensize(1)
+        
+        t.goto(coins[0])
+        t.pendown()
+        t.begin_fill()
+        for coin in coins[1:]:
+            t.goto(coin)
+        t.goto(coins[0])
+        t.end_fill()
+        t.penup()
+        
+        # Vitre arrière
+        offset = -self.longueur * 0.25
+        vx = self.x + offset * cos_a
+        vy = self.y + offset * sin_a
+        
+        coins = self._calculer_coins(vx, vy, 4, self.largeur * 0.5, angle)
+        
+        t.goto(coins[0])
+        t.pendown()
+        t.begin_fill()
+        for coin in coins[1:]:
+            t.goto(coin)
+        t.goto(coins[0])
+        t.end_fill()
+        t.penup()
+    
+    def _dessiner_phares(self, angle: float) -> None:
+        """Phares et feux arrière"""
+        t = self._turtle
+        cos_a = math.cos(math.radians(angle))
+        sin_a = math.sin(math.radians(angle))
+        
+        # Phares avant (jaunes)
+        offset = self.longueur / 2 - 2
         for side in [-1, 1]:
-            px = self.x + offset * cos_a + side * (self.largeur/2 - 3) * cos_a
-            py = self.y + offset * sin_a + side * (self.largeur/2 - 3) * sin_a
+            px = self.x + offset * cos_a
+            py = self.y + offset * sin_a
             
-            # Ajustement perpendiculaire
-            px += side * (self.largeur/2 - 4) * math.cos(math.radians(angle + 90))
-            py += side * (self.largeur/2 - 4) * math.sin(math.radians(angle + 90))
+            lateral = self.largeur / 2 - 4
+            px += side * lateral * math.cos(math.radians(angle + 90))
+            py += side * lateral * math.sin(math.radians(angle + 90))
             
             t.goto(px, py - 2)
+            t.fillcolor('#FFFF99')
+            t.pencolor('#CCCC00')
+            t.pensize(1)
             t.pendown()
-            t.fillcolor(couleur)
+            t.begin_fill()
+            t.circle(2)
+            t.end_fill()
+            t.penup()
+        
+        # Feux arrière (rouges)
+        offset = -self.longueur / 2 + 2
+        for side in [-1, 1]:
+            px = self.x + offset * cos_a
+            py = self.y + offset * sin_a
+            
+            lateral = self.largeur / 2 - 4
+            px += side * lateral * math.cos(math.radians(angle + 90))
+            py += side * lateral * math.sin(math.radians(angle + 90))
+            
+            # Plus lumineux si à l'arrêt (freinage)
+            feu_color = '#FF4444' if self.en_arret else '#CC0000'
+            
+            t.goto(px, py - 2)
+            t.fillcolor(feu_color)
+            t.pencolor('#990000')
+            t.pensize(1)
+            t.pendown()
             t.begin_fill()
             t.circle(2)
             t.end_fill()
             t.penup()
     
-    def _calculer_coins(self, cx: float, cy: float,
-                        longueur: float, largeur: float,
-                        angle: float) -> List[Tuple[float, float]]:
+    def _calculer_coins(self, cx: float, cy: float, longueur: float, 
+                        largeur: float, angle: float) -> List[Tuple[float, float]]:
         """Calcule les coins d'un rectangle orienté"""
         cos_a = math.cos(math.radians(angle))
         sin_a = math.sin(math.radians(angle))
         
         l2, w2 = longueur / 2, largeur / 2
-        
         coins_locaux = [(-l2, -w2), (l2, -w2), (l2, w2), (-l2, w2)]
         
-        coins = []
-        for lx, ly in coins_locaux:
-            rx = lx * cos_a - ly * sin_a + cx
-            ry = lx * sin_a + ly * cos_a + cy
-            coins.append((rx, ry))
-        
-        return coins
+        return [
+            (lx * cos_a - ly * sin_a + cx, lx * sin_a + ly * cos_a + cy)
+            for lx, ly in coins_locaux
+        ]
     
-    def _assombrir(self, hex_color: str) -> str:
+    def _assombrir(self, hex_color: str, factor: float = 0.7) -> str:
         """Assombrit une couleur"""
         hex_color = hex_color.lstrip('#')
-        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        r, g, b = int(r * 0.7), int(g * 0.7), int(b * 0.7)
-        return f'#{r:02x}{g:02x}{b:02x}'
+        if len(hex_color) < 6:
+            return '#333333'
+        try:
+            r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+            r, g, b = int(r * factor), int(g * factor), int(b * factor)
+            return f'#{r:02x}{g:02x}{b:02x}'
+        except:
+            return '#333333'
     
     def deplacer(self) -> None:
         """Déplace la voiture"""
@@ -182,30 +260,20 @@ class Voiture:
         self.vitesse = max(0, self.vitesse - self.deceleration)
     
     def distance_a_ligne_arret(self) -> float:
-        """
-        Distance à la ligne d'arrêt.
-        Retourne une valeur positive si AVANT la ligne,
-        négative si APRÈS (dans/passé l'intersection).
-        """
+        """Distance à la ligne d'arrêt"""
         ligne = DIMENSIONS.ligne_arret
         
         if self.direction == Direction.NORD:
-            return -ligne - self.y  # Ligne au sud, voiture va vers nord
+            return -ligne - self.y
         elif self.direction == Direction.SUD:
-            return self.y - ligne  # Ligne au nord, voiture va vers sud
+            return self.y - ligne
         elif self.direction == Direction.EST:
-            return -ligne - self.x  # Ligne à l'ouest, voiture va vers est
+            return -ligne - self.x
         elif self.direction == Direction.OUEST:
-            return self.x - ligne  # Ligne à l'est, voiture va vers ouest
-        
+            return self.x - ligne
         return 0
     
-    def est_avant_ligne(self) -> bool:
-        """Vérifie si la voiture est avant la ligne d'arrêt"""
-        return self.distance_a_ligne_arret() > 0
-    
     def est_dans_intersection(self) -> bool:
-        """Vérifie si la voiture est dans l'intersection"""
         zone = DIMENSIONS.zone_intersection
         return abs(self.x) < zone and abs(self.y) < zone
     
@@ -241,11 +309,8 @@ class GestionnaireVoitures:
         self.config = get_config(scenario)
     
     def creer_voiture(self, direction: Direction = None) -> Optional[Voiture]:
-        """Crée une nouvelle voiture"""
-        if not self.screen:
-            return None
-        
-        if len(self.voitures) >= self.config.max_voitures:
+        """Crée un nouveau véhicule"""
+        if not self.screen or len(self.voitures) >= self.config.max_voitures:
             return None
         
         if direction is None:
@@ -253,23 +318,28 @@ class GestionnaireVoitures:
         
         x, y = get_position_depart(direction)
         
-        # Vérifier collision au spawn
         if self._collision_spawn(x, y, direction):
             return None
         
         self.compteur_id += 1
         
-        vitesse_max = self.config.vitesse_base + random.uniform(
-            -self.config.vitesse_variation,
-            self.config.vitesse_variation
-        )
+        type_v = random.choice(list(TypeVehicule))
+        
+        vitesse_mult = {
+            TypeVehicule.BERLINE: 1.0,
+            TypeVehicule.SUV: 0.9,
+            TypeVehicule.COMPACT: 1.1,
+        }
+        
+        vitesse_max = self.config.vitesse_base * vitesse_mult[type_v]
+        vitesse_max += random.uniform(-self.config.vitesse_variation, self.config.vitesse_variation)
         
         voiture = Voiture(
             screen=self.screen,
             id=self.compteur_id,
             direction=direction,
-            x=x,
-            y=y,
+            x=x, y=y,
+            type_vehicule=type_v,
             vitesse_max=vitesse_max,
             couleur=random.choice(COULEURS_VOITURES)
         )
@@ -278,13 +348,12 @@ class GestionnaireVoitures:
         return voiture
     
     def _collision_spawn(self, x: float, y: float, direction: Direction) -> bool:
-        """Vérifie collision au point de spawn"""
-        dist_min = DIMENSIONS.distance_securite + DIMENSIONS.voiture_longueur
+        """Vérifie collision au spawn"""
+        dist_min = DIMENSIONS.distance_securite + 50
         
         for v in self.voitures:
             if v.direction == direction:
-                dist = math.sqrt((v.x - x)**2 + (v.y - y)**2)
-                if dist < dist_min:
+                if math.sqrt((v.x - x)**2 + (v.y - y)**2) < dist_min:
                     return True
         return False
     
@@ -304,7 +373,6 @@ class GestionnaireVoitures:
         for voiture in self.voitures:
             etat_feu = self.gestionnaire_feux.get_etat_pour_direction(voiture.direction)
             
-            # Logique d'arrêt
             doit_sarreter = self._doit_sarreter(voiture, etat_feu)
             voiture_devant = self._voiture_devant(voiture)
             
@@ -329,11 +397,9 @@ class GestionnaireVoitures:
             
             voiture.deplacer()
             
-            # Marquer si dans intersection
             if voiture.est_dans_intersection():
                 voiture.dans_intersection = True
             
-            # Hors écran
             if voiture.est_hors_ecran():
                 self._notifier('sortie', voiture)
                 a_supprimer.append(voiture)
@@ -344,37 +410,25 @@ class GestionnaireVoitures:
     
     def _doit_sarreter(self, voiture: Voiture, etat_feu: EtatFeu) -> bool:
         """Détermine si la voiture doit s'arrêter"""
-        
-        # Si déjà dans l'intersection, continuer !
         if voiture.dans_intersection or voiture.a_passe_feu:
             return False
         
-        # Distance à la ligne d'arrêt
         distance = voiture.distance_a_ligne_arret()
         
-        # Si passé la ligne (distance négative), marquer et continuer
         if distance <= 0:
             voiture.a_passe_feu = True
             return False
         
-        # Zone d'arrêt : doit s'arrêter si proche de la ligne
-        zone_decision = DIMENSIONS.distance_securite + voiture.longueur
+        zone = DIMENSIONS.distance_securite + voiture.longueur
         
-        # Feu rouge : s'arrêter si dans la zone
         if etat_feu == EtatFeu.ROUGE:
-            if distance < zone_decision:
-                return True
-        
-        # Feu orange : s'arrêter seulement si assez loin pour freiner
+            return distance < zone
         elif etat_feu == EtatFeu.ORANGE:
-            # Si très proche, continuer (ne peut plus s'arrêter à temps)
-            if distance < 40:
+            if distance < 35:
                 voiture.a_passe_feu = True
                 return False
-            if distance < zone_decision:
-                return True
+            return distance < zone
         
-        # Feu vert ou clignotant : pas d'arrêt
         return False
     
     def _voiture_devant(self, voiture: Voiture) -> bool:
@@ -382,33 +436,21 @@ class GestionnaireVoitures:
         dist_secu = DIMENSIONS.distance_securite
         
         for autre in self.voitures:
-            if autre.id == voiture.id:
-                continue
-            if autre.direction != voiture.direction:
+            if autre.id == voiture.id or autre.direction != voiture.direction:
                 continue
             
-            devant = False
-            dist = 0
-            
-            if voiture.direction == Direction.NORD:
-                if autre.y > voiture.y:
-                    devant = True
-                    dist = autre.y - voiture.y
-            elif voiture.direction == Direction.SUD:
-                if autre.y < voiture.y:
-                    devant = True
-                    dist = voiture.y - autre.y
-            elif voiture.direction == Direction.EST:
-                if autre.x > voiture.x:
-                    devant = True
-                    dist = autre.x - voiture.x
-            elif voiture.direction == Direction.OUEST:
-                if autre.x < voiture.x:
-                    devant = True
-                    dist = voiture.x - autre.x
-            
-            if devant and dist < dist_secu:
-                return True
+            if voiture.direction == Direction.NORD and autre.y > voiture.y:
+                if autre.y - voiture.y < dist_secu:
+                    return True
+            elif voiture.direction == Direction.SUD and autre.y < voiture.y:
+                if voiture.y - autre.y < dist_secu:
+                    return True
+            elif voiture.direction == Direction.EST and autre.x > voiture.x:
+                if autre.x - voiture.x < dist_secu:
+                    return True
+            elif voiture.direction == Direction.OUEST and autre.x < voiture.x:
+                if voiture.x - autre.x < dist_secu:
+                    return True
         
         return False
     
