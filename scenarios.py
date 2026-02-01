@@ -162,7 +162,7 @@ SCENARIOS_CONFIG: Dict[Scenario, ConfigScenario] = {
         freq_apparition=0.008,
         vitesse_base=2.0,
         vitesse_variation=0.3,
-        max_voitures=5,
+        max_voitures=7,
         mode_clignotant=True,
         delai_clignotement=0.5
     ),
