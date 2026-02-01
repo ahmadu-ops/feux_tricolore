@@ -232,7 +232,7 @@ COULEURS_VOITURES = [
 class DimensionsCarrefour:
     """Dimensions du carrefour"""
     # Routes
-    largeur_route: int = 100
+    largeur_route: int = 65
     largeur_voie: int = 50
     
     # Feux
@@ -243,12 +243,12 @@ class DimensionsCarrefour:
     
     # Voitures
     voiture_largeur: int = 22
-    voiture_longueur: int = 40
+    voiture_longueur: int = 35
     
     # Distances - IMPORTANT pour l'arrêt
-    ligne_arret: int = 110  # Distance du centre à la ligne d'arrêt
+    ligne_arret: int = 20  # Distance du centre à la ligne d'arrêt
     zone_intersection: int = 100  # Zone centrale du carrefour
-    distance_securite: int = 50  # Distance entre voitures
+    distance_securite: int = 70  # Distance entre voitures
     limite_ecran: int = 380  # Limite pour sortie
 
 
